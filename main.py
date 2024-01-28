@@ -1,22 +1,15 @@
 import numpy as np
 
 import torch
-from torch.nn import L1Loss
-from torch.optim import adadelta
-# from losses import L1Loss as L1Loss2
 
-loss = L1Loss()
-loss2 = L1Loss2()
+m = torch.tensor([3., 4.], requires_grad=True)
+v = torch.tensor([1., 2.], requires_grad=True)
 
-a = torch.tensor([1, 2., 3.])
-b = torch.tensor([1., 3., 3.], requires_grad=True).backward()
+r = v @ m
 
-output = loss(a, b)
+print('SAIDA', r)
 
-print(output)
+r.backward(torch.tensor(1.))
 
-output.backward()
-
-print(a.grad, b.grad)
-
-print(loss2(np.array([1, 2, 3]), np.array([1, 3, 3])))
+print('M GRAD', m.grad)
+print('V GRAD', v.grad)

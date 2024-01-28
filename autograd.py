@@ -2,8 +2,6 @@ from typing import Union, Optional, Callable
 
 import numpy as np
 
-# np.seterr(all='ignore')
-
 Arrayable = Union[int, float, tuple, list, np.ndarray]
 
 def ensure_array(arrayable: Arrayable) -> np.ndarray:
@@ -53,10 +51,12 @@ class Tensor:
         
         data = self.data + other.data
         requires_grad = self.requires_grad or other.requires_grad
+        grad_fn = None
         
-        def grad_fn(grad: np.ndarray):
-            self.backward(grad)
-            other.backward(grad)
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                self.backward(grad)
+                other.backward(grad)
         
         return Tensor(data, requires_grad, grad_fn)
 
@@ -72,10 +72,12 @@ class Tensor:
         
         data = self.data - other.data
         requires_grad = self.requires_grad or other.requires_grad
+        grad_fn = None
         
-        def grad_fn(grad: np.ndarray):
-            self.backward(grad)
-            other.backward(-grad)
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                self.backward(grad)
+                other.backward(-grad)
         
         return Tensor(data, requires_grad, grad_fn)
 
@@ -88,14 +90,16 @@ class Tensor:
         ''' Gets called when using t * other '''
         
         other = ensure_tensor(other)
-        
+
         data = self.data * other.data
         requires_grad = self.requires_grad or other.requires_grad
+        grad_fn = None
         
-        def grad_fn(grad: np.ndarray):
-            self.backward(grad * other.data)
-            other.backward(grad * self.data)
-        
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                self.backward(grad * other.data)
+                other.backward(grad * self.data)
+            
         return Tensor(data, requires_grad, grad_fn)
 
     def __rmul__(self, other):
@@ -103,24 +107,85 @@ class Tensor:
         
         return ensure_tensor(other).__mul__(self)
 
+    def __div__(self, other):
+        ''' Gets called when using t / other '''
+        
+        other = ensure_tensor(other)
+        
+        data = self.data / other.data
+        requires_grad = self.requires_grad or other.requires_grad
+        grad_fn = None
+    
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                self.backward(grad / other.data)
+                other.backward(-grad * self.data / other.data ** 2)
+        
+        return Tensor(data, requires_grad, grad_fn)
+    
+    def __rdiv__(self, other):
+        ''' Gets called when using other / t '''
+        
+        return ensure_tensor(other).__div__(self)  
+
     def __pow__(self, other):
         ''' Gets called when using t ** other '''
         
         other = ensure_tensor(other)
+        
         data = self.data ** other.data
-        
         requires_grad = self.requires_grad or other.requires_grad
-    
-        def grad_fn(grad: np.ndarray):
-            self.backward(grad * other.data * self.data ** (other.data - 1))
-            other.backward(grad * np.log(self.data) * self.data ** other.data)
+        grad_fn = None
         
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                self.backward(grad * other.data * self.data ** (other.data - 1))
+                other.backward(grad * np.log(self.data) * self.data ** other.data)
+            
         return Tensor(data, requires_grad, grad_fn)
 
     def __rpow__(self, other):
         ''' Gets called when using other ** t '''
         
         return ensure_tensor(other).__pow__(self)
+
+    def __matmul__(self, other):
+        ''' Gets called when using t @ other '''
+        
+        other = ensure_tensor(other)
+        data = self.data @ other.data
+        grad_fn = None
+        
+        requires_grad = self.requires_grad or other.requires_grad
+
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                # Matrix @ Matrix
+                if self.data.ndim > 1 and other.data.ndim > 1:
+                    self.backward(grad @ other.data.T)
+                    other.backward(self.data.T @ grad)
+            
+                # Vector @ Vector
+                elif self.data.ndim == 1 and other.data.ndim == 1:
+                    self.backward(grad * other.data)
+                    other.backward(grad * self.data)
+
+                # Matrix @ Vector 
+                elif self.data.ndim > 1 and other.data.ndim == 1:
+                    self.backward(np.outer(grad, other.data))
+                    other.backward(self.data.T @ grad)
+                    
+                # Vector @ Matrix
+                elif self.data.ndim == 1 and other.data.ndim > 1:
+                    self.backward(grad @ other.data.T)
+                    other.backward(np.outer(self.data, grad))
+
+        return Tensor(data, requires_grad, grad_fn)
+
+    def __rmatmul__(self, other):
+        ''' Gets called when using other @ t '''
+        
+        return ensure_tensor(other).__matmul__(self)
 
     def backward(self, grad: Optional[Arrayable] = None):   
         if not self.requires_grad or self.grad is None:
@@ -154,11 +219,16 @@ class Tensor:
         if self.grad_fn is not None:
             self.grad_fn(grad)
             
-y = Tensor([4], requires_grad=False)
-p = Tensor([4], requires_grad=True)
+m = Tensor([3, 4], requires_grad=True)
+v = Tensor([1, 2], requires_grad=True)
 
-y_p = 0.5 * ((p - y) ** 2)
+r = v @ m
 
-y_p.backward()
+print('-------------------')
 
-print(p.grad)
+print('SAIDA', r)
+
+r.backward()
+
+print('M GRAD', m.grad)
+print('V GRAD', v.grad)
