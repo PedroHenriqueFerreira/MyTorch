@@ -274,13 +274,50 @@ class Tensor:
                 axis_list = list(axis) if isinstance(axis, tuple) else axis
                 size = np.prod(np.array(self.data.shape)[axis_list])
                 
-                # Compute the mean
+                # Compute mean and xmu
                 mean = self.data.mean(axis=axis, keepdims=True)
-                
-                # Compute the centered data
-                xmu = self.data - mean
+                xmu = self.data - mean 
                 
                 self.backward(grad * np.ones(self.data.shape) * 2 * xmu / size)
+        
+        return Tensor(data, requires_grad, grad_fn)
+
+    def sqrt(self):
+        ''' Returns the square root of the tensor '''
+        
+        data = np.sqrt(self.data)
+        requires_grad = self.requires_grad
+        grad_fn = None
+        
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                self.backward(grad / (2 * np.sqrt(self.data)))
+                 
+        return Tensor(data, requires_grad, grad_fn)
+
+    def log(self):
+        ''' Returns the log of the tensor '''
+        
+        data = np.log(self.data)
+        requires_grad = self.requires_grad
+        grad_fn = None
+        
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                self.backward(grad / self.data)
+            
+        return Tensor(data, requires_grad, grad_fn)
+
+    def exp(self):
+        ''' Returns the exponential of the tensor '''
+        
+        data = np.exp(self.data)
+        requires_grad = self.requires_grad
+        grad_fn = None
+        
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                self.backward(grad * data)
         
         return Tensor(data, requires_grad, grad_fn)
 
