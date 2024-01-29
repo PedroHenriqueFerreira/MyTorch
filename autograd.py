@@ -44,6 +44,32 @@ class Tensor:
         
         self.grad = np.zeros(self.data.shape)
     
+    def __pos__(self):
+        ''' Gets called when using +t '''
+        
+        data = self.data
+        requires_grad = self.requires_grad
+        grad_fn = None
+        
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                self.backward(grad)
+        
+        return Tensor(data, requires_grad, grad_fn)
+    
+    def __neg__(self):
+        ''' Gets called when using -t '''
+        
+        data = -self.data
+        requires_grad = self.requires_grad
+        grad_fn = None
+        
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                self.backward(-grad)
+        
+        return Tensor(data, requires_grad, grad_fn)
+    
     def __add__(self, other):
         ''' Gets called when using t + other '''
         
@@ -187,6 +213,77 @@ class Tensor:
         
         return ensure_tensor(other).__matmul__(self)
 
+    def sum(self, *args, **kwargs):
+        ''' Returns the sum of the tensor '''
+        
+        axis = args[0] if args else kwargs.get('axis', None)
+        
+        data = self.data.sum(*args, **kwargs)
+        requires_grad = self.requires_grad
+        grad_fn = None
+        
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                # Expand gradient to match data shape
+                if self.data.ndim != grad.ndim and axis is not None:
+                    grad = np.expand_dims(grad, axis)
+                
+                self.backward(grad * np.ones(self.data.shape))
+                
+        return Tensor(data, requires_grad, grad_fn)
+
+    def mean(self, *args, **kwargs):
+        ''' Returns the mean of the tensor '''
+        
+        axis = args[0] if args else kwargs.get('axis', None)
+        
+        data = self.data.mean(*args, **kwargs)
+        requires_grad = self.requires_grad
+        grad_fn = None
+        
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                # Expand gradient to match data shape
+                if self.data.ndim != grad.ndim and axis is not None:
+                    grad = np.expand_dims(grad, axis)
+                
+                # Compute size of the mean
+                axis_list = list(axis) if isinstance(axis, tuple) else axis
+                size = np.prod(np.array(self.data.shape)[axis_list])
+                
+                self.backward(grad * np.ones(self.data.shape) / size)
+
+        return Tensor(data, requires_grad, grad_fn)
+
+    def var(self, *args, **kwargs):
+        ''' Returns the variance of the tensor '''
+        
+        axis = args[0] if args else kwargs.get('axis', None)
+        
+        data = self.data.var(*args, **kwargs)
+        requires_grad = self.requires_grad
+        grad_fn = None
+        
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                # Expand gradient to match data shape
+                if self.data.ndim != grad.ndim and axis is not None:
+                    grad = np.expand_dims(grad, axis)
+                
+                # Compute size of the var
+                axis_list = list(axis) if isinstance(axis, tuple) else axis
+                size = np.prod(np.array(self.data.shape)[axis_list])
+                
+                # Compute the mean
+                mean = self.data.mean(axis=axis, keepdims=True)
+                
+                # Compute the centered data
+                xmu = self.data - mean
+                
+                self.backward(grad * np.ones(self.data.shape) * 2 * xmu / size)
+        
+        return Tensor(data, requires_grad, grad_fn)
+
     def backward(self, grad: Optional[Arrayable] = None):   
         if not self.requires_grad or self.grad is None:
             return
@@ -219,16 +316,11 @@ class Tensor:
         if self.grad_fn is not None:
             self.grad_fn(grad)
             
-m = Tensor([3, 4], requires_grad=True)
-v = Tensor([1, 2], requires_grad=True)
+y = Tensor([3, 4], requires_grad=True)
+p = Tensor([2, 3.5], requires_grad=True)
 
-r = v @ m
+mse = (0.5 * (y - p) ** 2).mean()
 
-print('-------------------')
+mse.backward()
 
-print('SAIDA', r)
-
-r.backward()
-
-print('M GRAD', m.grad)
-print('V GRAD', v.grad)
+print('MSE', p.grad)

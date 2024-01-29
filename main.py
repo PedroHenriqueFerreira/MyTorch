@@ -2,14 +2,11 @@ import numpy as np
 
 import torch
 
-m = torch.tensor([3., 4.], requires_grad=True)
-v = torch.tensor([1., 2.], requires_grad=True)
+y = torch.tensor([3., 4.], requires_grad=True)
+p = torch.tensor([2., 3.5], requires_grad=True)
 
-r = v @ m
+mse = (0.5 * (y - p) ** 2).mean()
 
-print('SAIDA', r)
+mse.backward()
 
-r.backward(torch.tensor(1.))
-
-print('M GRAD', m.grad)
-print('V GRAD', v.grad)
+print('MSE', p.grad)
