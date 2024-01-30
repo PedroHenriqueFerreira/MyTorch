@@ -321,6 +321,9 @@ class Tensor:
         
         return Tensor(data, requires_grad, grad_fn)
 
+    def tanh(self):
+        ''' Returns the hyperbolic tangent of the tensor '''
+
     def backward(self, grad: Optional[Arrayable] = None):   
         if not self.requires_grad or self.grad is None:
             return
@@ -352,12 +355,3 @@ class Tensor:
         
         if self.grad_fn is not None:
             self.grad_fn(grad)
-            
-y = Tensor([3, 4], requires_grad=True)
-p = Tensor([2, 3.5], requires_grad=True)
-
-mse = (0.5 * (y - p) ** 2).mean()
-
-mse.backward()
-
-print('MSE', p.grad)
