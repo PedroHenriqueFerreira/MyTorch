@@ -7,8 +7,8 @@ class Tensor:
     def __init__(
         self,
         data: ArrayLike,
-        requires_grad: bool = False,
         dtype: Optional[DTypeLike] = None,
+        requires_grad: bool = False,
         grad_fn: Optional[Callable[[np.ndarray], None]] = None
     ):
         self.data = np.array(data, dtype=dtype)
@@ -23,25 +23,25 @@ class Tensor:
     def __repr__(self):
         ''' Returns a string representation of the tensor '''
 
-        return f'Tensor({self.data}, requires_grad={self.requires_grad}, dtype={self.dtype})'
+        return f'Tensor({self.data}, dtype={self.dtype}, requires_grad={self.requires_grad})'
 
     @staticmethod
     def tensor(
         data: Union['Tensor', ArrayLike], 
-        requires_grad: bool = False, 
-        dtype: Optional[DTypeLike] = None
+        dtype: Optional[DTypeLike] = None,
+        requires_grad: bool = False
     ):
         ''' Factory function to create a tensor '''
         
         if isinstance(data, Tensor):
             return data
         
-        return Tensor(data, requires_grad, dtype)
+        return Tensor(data, dtype, requires_grad)
 
     def zero_grad(self):
         ''' Zeros the gradient of the tensor '''
 
-        self.grad = np.zeros(self.data.shape)
+        self.grad = np.zeros(self.data.shape, dtype=self.dtype)
 
     def pos(self):
         ''' Gets called when using +t '''
@@ -54,7 +54,7 @@ class Tensor:
             def grad_fn(grad: np.ndarray):
                 self.backward(grad)
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def __pos__(self):
         ''' Gets called when using +t '''
@@ -72,7 +72,7 @@ class Tensor:
             def grad_fn(grad: np.ndarray):
                 self.backward(-grad)
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def __neg__(self):
         ''' Gets called when using -t '''
@@ -93,7 +93,7 @@ class Tensor:
                 self.backward(grad)
                 tensor.backward(grad)
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def __add__(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using t + other '''
@@ -119,7 +119,7 @@ class Tensor:
                 self.backward(grad)
                 tensor.backward(-grad)
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def __sub__(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using t - other '''
@@ -145,7 +145,7 @@ class Tensor:
                 self.backward(grad * tensor.data)
                 tensor.backward(grad * self.data)
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def __mul__(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using t * other '''
@@ -171,7 +171,7 @@ class Tensor:
                 self.backward(grad / tensor.data)
                 tensor.backward(-grad * self.data / tensor.data ** 2)
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def __truediv__(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using t / other '''
@@ -197,7 +197,7 @@ class Tensor:
                 self.backward(grad * tensor.data * self.data ** (tensor.data - 1))
                 tensor.backward(grad * np.log(self.data) * data)
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def __pow__(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using t ** other '''
@@ -240,7 +240,7 @@ class Tensor:
                     self.backward(grad @ tensor.data.swapaxes(-1, -2))
                     tensor.backward(np.outer(self.data, grad))
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def __matmul__(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using t @ other '''
@@ -263,7 +263,7 @@ class Tensor:
             def grad_fn(grad: np.ndarray):
                 self.backward(grad * np.sign(self.data))
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def __abs__(self):
         ''' Returns the absolute value of the tensor '''
@@ -285,7 +285,7 @@ class Tensor:
 
                 self.backward(grad * np.ones(self.data.shape))
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def mean(self, axis: Optional[_ShapeLike] = None, keepdims: bool = False):
         ''' Returns the mean of the tensor '''
@@ -306,7 +306,7 @@ class Tensor:
 
                 self.backward(grad * np.ones(self.data.shape) / size)
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def var(self, axis: Optional[_ShapeLike] = None, keepdims: bool = False):
         ''' Returns the variance of the tensor '''
@@ -330,7 +330,7 @@ class Tensor:
 
                 self.backward(grad * np.ones(self.data.shape) * 2 * (self.data - mean) / size)
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def sqrt(self):
         ''' Returns the square root of the tensor '''
@@ -343,7 +343,7 @@ class Tensor:
             def grad_fn(grad: np.ndarray):
                 self.backward(grad / (2 * data))
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def log(self):
         ''' Returns the log of the tensor '''
@@ -356,7 +356,7 @@ class Tensor:
             def grad_fn(grad: np.ndarray):
                 self.backward(grad / self.data)
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def exp(self):
         ''' Returns the exponential of the tensor '''
@@ -369,7 +369,7 @@ class Tensor:
             def grad_fn(grad: np.ndarray):
                 self.backward(grad * data)
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def tanh(self):
         ''' Returns the hyperbolic tangent of the tensor '''
@@ -382,7 +382,7 @@ class Tensor:
             def grad_fn(grad: np.ndarray):
                 self.backward(grad * (1 - data ** 2))
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def sin(self):
         ''' Returns the sine of the tensor '''
@@ -395,7 +395,7 @@ class Tensor:
             def grad_fn(grad: np.ndarray):
                 self.backward(grad * np.cos(self.data))
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def cos(self):
         ''' Returns the cosine of the tensor '''
@@ -408,7 +408,7 @@ class Tensor:
             def grad_fn(grad: np.ndarray):
                 self.backward(grad * -np.sin(self.data))
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def maximum(self, other: Union['Tensor', ArrayLike]):
         ''' Returns the max values of the tensor '''
@@ -424,7 +424,7 @@ class Tensor:
                 self.backward(grad * (self.data >= tensor.data))
                 tensor.backward(grad * (tensor.data >= self.data))
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def minimum(self, other: Union['Tensor', ArrayLike]):
         ''' Returns the min values of the tensor '''
@@ -440,7 +440,7 @@ class Tensor:
                 self.backward(grad * (self.data <= tensor.data))
                 tensor.backward(grad * (tensor.data <= self.data))
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def max(self, axis: Optional[_ShapeLike] = None, keepdims: bool = False):
         ''' Returns the biggest value of the tensor '''
@@ -457,7 +457,7 @@ class Tensor:
 
                 self.backward(grad * (self.data == self.data.max(axis=axis, keepdims=True)))
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def min(self, axis: Optional[_ShapeLike] = None, keepdims: bool = False):
         ''' Returns the small value of the tensor '''
@@ -474,7 +474,7 @@ class Tensor:
 
                 self.backward(grad * (self.data == self.data.min(axis=axis, keepdims=True)))
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def concatenate(self, *arrays: Union['Tensor', ArrayLike], axis: SupportsIndex = 0):
         ''' Concatenates the tensors '''
@@ -495,7 +495,7 @@ class Tensor:
                 for tensor, grad in zip(tensors, grads):
                     tensor.backward(grad)
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def reshape(self, shape: _ShapeLike):
         ''' Reshapes the tensor '''
@@ -508,7 +508,7 @@ class Tensor:
             def grad_fn(grad: np.ndarray):
                 self.backward(grad.reshape(self.data.shape))
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def transpose(self, axes: Optional[_ShapeLike] = None):
         ''' Transposes the tensor '''
@@ -524,7 +524,7 @@ class Tensor:
             def grad_fn(grad: np.ndarray):
                 self.backward(grad.transpose(axes))
                 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def swapaxes(self, axis1: SupportsIndex, axis2: SupportsIndex):
         ''' Swaps the axes of the tensor '''
@@ -537,7 +537,7 @@ class Tensor:
             def grad_fn(grad: np.ndarray):
                 self.backward(grad.swapaxes(axis1, axis2))
 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def flip(self, axis: Optional[_ShapeLike] = None):
         ''' Flips the tensor '''
@@ -553,7 +553,7 @@ class Tensor:
             def grad_fn(grad: np.ndarray):
                 self.backward(np.flip(grad, axis=axis))
                 
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def __iter__(self):
         ''' Returns an iterator over the tensor '''
@@ -575,12 +575,7 @@ class Tensor:
                 
                 self.backward(grad_)
         
-        return Tensor(data, requires_grad, grad_fn=grad_fn)
-
-    def __array__(self, dtype: Optional[DTypeLike] = None):
-        ''' Returns the tensor as a numpy array '''
-        
-        return self.data.astype(dtype, copy=False)
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     @property
     def shape(self):
