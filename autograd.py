@@ -29,14 +29,20 @@ class Tensor:
     def tensor(
         data: Union['Tensor', ArrayLike], 
         dtype: Optional[DTypeLike] = None,
-        requires_grad: bool = False
+        requires_grad: bool = False,
+        grad_fn: Optional[Callable[[np.ndarray], None]] = None
     ):
         ''' Factory function to create a tensor '''
         
         if isinstance(data, Tensor):
             return data
         
-        return Tensor(data, dtype, requires_grad)
+        return Tensor(data, dtype, requires_grad, grad_fn)
+
+    def detach(self):
+        ''' Detaches the tensor from the computation graph '''
+        
+        return Tensor(self.data, self.dtype, requires_grad=False)
 
     def zero_grad(self):
         ''' Zeros the gradient of the tensor '''

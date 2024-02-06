@@ -1,11 +1,14 @@
-from torch import tensor, optim
-from tensor import Tensor
+from torch import tensor
+from torch.optim import SGD
+from torch.nn import ac
 
 t1 = tensor([1., 2., 3.], requires_grad=True)
-t2 = Tensor([1., 2., 3.], requires_grad=True)
 
-t1.mean().backward()
-t2.mean().backward()
+sgd = SGD([t1], lr=0.1)
 
-print(t1.grad)
-print(t2.grad)
+for i in range(10):
+    loss = t1.sum()
+    loss.backward()
+    sgd.step()
+    sgd.zero_grad()
+    print(t1)
