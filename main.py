@@ -1,6 +1,5 @@
 from torch import tensor
-from torch.optim import SGD
-from torch.nn import ac
+from torch.optim import SGD, Adam, Adadelta, Adamax, Adagrad, NAdam, RMSprop
 
 t1 = tensor([1., 2., 3.], requires_grad=True)
 
