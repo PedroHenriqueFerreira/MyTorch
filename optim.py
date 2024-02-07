@@ -1,18 +1,17 @@
+from abc import ABC, abstractmethod
+
 from autograd import Tensor
 
 import numpy as np
 
-class Optimizer:
+class Optimizer(ABC):
     ''' Base class for all optimizers. '''
     
-    def __init__(self, params: list[Tensor]):
-        ''' Initializing the optimizer parameters. '''
-        self.params = params
-    
+    @abstractmethod
     def step(self):
         ''' Update the parameters. '''
         
-        raise NotImplementedError()
+        pass
     
     def zero_grad(self):
         ''' Zero the gradients of the parameters. '''
@@ -141,19 +140,8 @@ class Adadelta:
             delta = np.sqrt(self.u[i] + self.eps) / np.sqrt(self.v[i] + self.eps) * param.grad
             self.u[i] = self.rho * self.u[i] + (1 - self.rho) * delta ** 2
             
-            print(self.v[i])
-            print(self.u[i])
-            
             param -= self.lr * delta
-    
-t = Tensor(1, requires_grad=True)
-t.grad = np.array(1)
-    
-adaDelta = Adadelta([t])
-
-for i in range(6):
-    adaDelta.step()
-            
+     
 class Adam(Optimizer):
     ''' Adaptive Moment Estimation optimizer. '''
     
