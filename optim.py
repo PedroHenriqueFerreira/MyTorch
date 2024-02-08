@@ -141,7 +141,7 @@ class Adadelta:
             self.u[i] = self.rho * self.u[i] + (1 - self.rho) * delta ** 2
             
             param -= self.lr * delta
-     
+
 class Adam(Optimizer):
     ''' Adaptive Moment Estimation optimizer. '''
     
@@ -179,3 +179,40 @@ class Adam(Optimizer):
             v_hat = self.v[i] / (1 - self.betas[1] ** self.t)
             
             param -= self.lr * m_hat / (np.sqrt(v_hat) + self.eps)
+    
+class Adamax(Optimizer):
+    ''' Adam with infinity norm. '''
+    
+    def __init__(
+        self, 
+        params: list[Tensor], 
+        lr: float = 2e-3, 
+        betas: tuple[float, float] = (0.9, 0.999), 
+        eps: float = 1e-8
+    ):
+        
+        self.params = params
+        self.lr = lr
+        self.betas = betas
+        self.eps = eps
+        
+        self.m = [np.zeros(param.shape) for param in self.params]
+        self.u = [np.zeros(param.shape) for param in self.params]
+        
+        self.t = 0
+        
+    def step(self):
+        
+        self.t += 1
+        
+        for i, param in enumerate(self.params):
+            
+            if param.grad is None:
+                continue
+            
+            self.m[i] = self.betas[0] * self.m[i] + (1 - self.betas[0]) * param.grad
+            self.u[i] = np.maximum(self.betas[1] * self.u[i], np.abs(param.grad))
+            
+            m_hat = self.m[i] / (1 - self.betas[0] ** self.t)
+            
+            param -= self.lr * m_hat / (self.u[i] + self.eps)
