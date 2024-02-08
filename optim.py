@@ -52,7 +52,7 @@ class SGD(Optimizer):
             if self.nesterov:
                 param -= self.momentum * self.m[i] + self.lr * param.grad
             else:
-                param -= self.v[i]
+                param -= self.m[i]
 
 class Adagrad:
     ''' Adaptive Gradient optimizer. '''
