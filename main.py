@@ -1,13 +1,22 @@
-from torch import tensor
-from torch.optim import SGD, Adam, Adadelta, Adamax, Adagrad, NAdam, RMSprop
+# import torch
+from mytorch.nn.activations import Sigmoid, SigmoidFast
+from mytorch.autograd import Tensor
 
-t1 = tensor([1., 2., 3.], requires_grad=True)
+import numpy as np
 
-sgd = SGD([t1], lr=0.1)
+from time import time
 
-for i in range(10):
-    loss = t1.sum()
-    loss.backward()
-    sgd.step()
-    sgd.zero_grad()
-    print(t1)
+ini = time()
+
+act = Sigmoid()
+
+y = Tensor(np.random.randn(1000, 10000), requires_grad=True)
+res = act(y)
+
+print(res)
+
+res.backward()
+
+print(y.grad)
+
+print("Time:", time() - ini)

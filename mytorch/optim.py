@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from autograd import Tensor
+from mytorch.autograd import Tensor
 
 import numpy as np
 
