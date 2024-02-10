@@ -1,22 +1,23 @@
-# import torch
-from mytorch.nn.activations import Sigmoid, SigmoidFast
 from mytorch.autograd import Tensor
 
 import numpy as np
 
-from time import time
+from mytorch.nn.activations import Softmax, Softmax2
 
-ini = time()
+t1 = Tensor(np.array([[0, 1], [2, 3], [4, 5]]), requires_grad=True)
+t2 = Tensor(np.array([[0, 1], [2, 3], [4, 5]]), requires_grad=True)
 
-act = Sigmoid()
+f1 = Softmax()
+f2 = Softmax2()
 
-y = Tensor(np.random.randn(1000, 10000), requires_grad=True)
-res = act(y)
+y1 = f1(t1)
+y2 = f2(t2)
 
-print(res)
+print(y1)
+print(y2)
 
-res.backward()
+y1.backward([[1, 2], [3, 4], [5, 6]])
+y2.backward([[1, 2], [3, 4], [5, 6]])
 
-print(y.grad)
-
-print("Time:", time() - ini)
+print(t1.grad)
+print(t2.grad)

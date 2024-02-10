@@ -41,7 +41,6 @@ class SGD(Optimizer):
         self.m = [np.zeros(param.shape) for param in self.params]
         
     def step(self):
-        
         for i, param in enumerate(self.params):
             
             if param.grad is None:
@@ -70,8 +69,7 @@ class Adagrad:
         
         self.v = [np.zeros(param.shape) for param in self.params]
         
-    def step(self):
-            
+    def step(self):  
         for i, param in enumerate(self.params):
             
             if param.grad is None:
@@ -100,7 +98,6 @@ class RMSProp:
         self.v = [np.zeros(param.shape) for param in self.params]
     
     def step(self):
-        
         for i, param in enumerate(self.params):
             
             if param.grad is None:
@@ -130,7 +127,6 @@ class Adadelta:
         self.u = [np.zeros(param.shape) for param in self.params]
         
     def step(self):
-        
         for i, param in enumerate(self.params):
             
             if param.grad is None:
@@ -164,7 +160,6 @@ class Adam(Optimizer):
         self.t = 0
         
     def step(self):
-        
         self.t += 1
         
         for i, param in enumerate(self.params):
@@ -202,7 +197,6 @@ class Adamax(Optimizer):
         self.t = 0
         
     def step(self):
-        
         self.t += 1
         
         for i, param in enumerate(self.params):
