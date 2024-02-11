@@ -140,7 +140,7 @@ class SELU(Activation):
                 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
     
-class GELU(Activation): # TODO: Check gradient
+class GELU(Activation):
     ''' Gaussian Error Linear Unit activation function. '''
     
     def forward(self, x: Tensor):
