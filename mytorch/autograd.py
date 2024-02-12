@@ -636,6 +636,9 @@ class Tensor:
 
             grad = grad.sum(axis=axis, keepdims=keepdims).reshape(self.data.shape)
 
+        print('Id:', id(self), 'Grad:', grad)
+        print('Final grad:', self.grad + grad)
+
         # Accumulate gradient
         self.grad += grad
 

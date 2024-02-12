@@ -166,24 +166,6 @@ class Softmax(Activation):
         self.axis = axis
     
     def forward(self, x: Tensor):
-        e_x = np.exp(x.data - np.max(x.data, axis=self.axis, keepdims=True))
-        data = e_x / np.sum(e_x, axis=self.axis, keepdims=True)
-        requires_grad = x.requires_grad
-        grad_fn = None
-        
-        if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                x.backward(grad * data * (1 - data))
-                
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
-    
-class Softmax2(Activation): # TODO: Check gradient
-    ''' Softmax activation function. '''
-    
-    def __init__(self, axis: int = 1):
-        self.axis = axis
-    
-    def forward(self, x: Tensor):
         e_x = (x - x.max(axis=self.axis, keepdims=True)).exp()
         
         return e_x / e_x.sum(axis=self.axis, keepdims=True)
