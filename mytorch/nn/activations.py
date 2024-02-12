@@ -4,6 +4,8 @@ from mytorch.autograd import Tensor
 
 import numpy as np
 
+from math import pi, sqrt
+
 class Activation(ABC):
     ''' Base class for all loss functions. '''
     
@@ -18,33 +20,17 @@ class Activation(ABC):
         
         return self.forward(x)
     
-class Sigmoid:
+class Sigmoid(Activation):
     ''' Sigmoid activation function. '''
     
     def forward(self, x: Tensor) -> Tensor:
-        data = 1 / (1 + np.exp(-x.data))
-        requires_grad = x.requires_grad
-        grad_fn = None
-        
-        if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                x.backward(grad * data * (1 - data))
-        
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+        return 1 / (1 + (-x).exp())
     
 class ReLU(Activation):
     ''' Rectified Linear Unit activation function. '''
     
     def forward(self, x: Tensor):
-        data = np.maximum(0, x.data)
-        requires_grad = x.requires_grad
-        grad_fn = None
-        
-        if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                x.backward(grad * (data > 0))
-                
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+        return x.maximum(0)
     
 class LeakyReLU(Activation):
     ''' Leaky Rectified Linear Unit activation function. '''
@@ -53,62 +39,33 @@ class LeakyReLU(Activation):
         self.alpha = alpha
         
     def forward(self, x: Tensor):
-        data = np.where(x.data <= 0, x.data * self.alpha, x.data)
-        requires_grad = x.requires_grad
-        grad_fn = None
-        
-        if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                x.backward(grad * np.where(data <= 0, self.alpha, 1))
-                
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+        return x.maximum(x * self.alpha)
     
 class Tanh(Activation):
     ''' Hyperbolic Tangent activation function. '''
     
     def forward(self, x: Tensor):
-        data = np.tanh(x.data)
-        requires_grad = x.requires_grad
-        grad_fn = None
-        
-        if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                x.backward(grad * (1 - data ** 2))
-                
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+        return x.tanh()
 
 class Softplus(Activation):
     ''' Softplus activation function. '''
     
+    def __init__(self, beta: float = 1):
+        self.beta = beta
+    
     def forward(self, x: Tensor):
-        data = np.log(1 + np.exp(x.data))
-        requires_grad = x.requires_grad
-        grad_fn = None
-        
-        if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                x.backward(grad * 1 / (1 + np.exp(-x.data)))
-                
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+        return (1 / self.beta) * (1 + (self.beta * x).exp()).log()
     
 class Softsign(Activation):
     ''' Softsign activation function. '''
     
     def forward(self, x: Tensor):
-        data = x.data / (1 + np.abs(x.data))
-        requires_grad = x.requires_grad
-        grad_fn = None
-        
-        if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                x.backward(grad / (1 + np.abs(x.data)) ** 2)
-                
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+        return x / (1 + x.abs())
     
 class ELU(Activation):
     ''' Exponential Linear Unit activation function. '''
     
-    def __init__(self, alpha: float = 0.1):
+    def __init__(self, alpha: float = 1.0):
         self.alpha = alpha
         
     def forward(self, x: Tensor):
@@ -126,8 +83,8 @@ class SELU(Activation):
     ''' Scaled Exponential Linear Unit activation function. '''
     
     def __init__(self):
-        self.alpha = 1.6732632423543772848170429916717
         self.lmbda = 1.0507009873554804934193349852946
+        self.alpha = 1.6732632423543772848170429916717
         
     def forward(self, x: Tensor):
         data = self.lmbda * np.where(x.data <= 0, self.alpha * (np.exp(x.data) - 1), x.data)
@@ -144,20 +101,7 @@ class GELU(Activation):
     ''' Gaussian Error Linear Unit activation function. '''
     
     def forward(self, x: Tensor):
-        data = 0.5 * x.data * (1 + np.tanh(np.sqrt(2 / np.pi) * (x.data + 0.044715 * x.data ** 3)))
-        requires_grad = x.requires_grad
-        grad_fn = None
-        
-        if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                x.backward(grad * (
-                    0.5 * np.tanh(0.0356774 * x.data ** 3 + 0.797885 * x.data) 
-                    + (0.0535161 * x.data ** 3 + 0.398942 * x.data)
-                    * (1 / np.cosh(0.0356774 * x.data ** 3 + 0.797885 * x.data)) ** 2
-                    + 0.5
-                ))
-                
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+        return 0.5 * x * (1 + (sqrt(2 / pi) * (x + 0.044715 * x ** 3)).tanh())
     
 class Softmax(Activation):
     ''' Softmax activation function. '''

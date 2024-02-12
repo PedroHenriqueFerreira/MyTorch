@@ -615,7 +615,7 @@ class Tensor:
 
     def backward(self, grad: Optional[ArrayLike] = None):
         if not self.requires_grad or self.grad is None:
-            raise Exception('Cannot call backward on a tensor that does not require grad')
+            return
 
         # Initialize gradient if not provided
         if grad is None:
@@ -635,9 +635,6 @@ class Tensor:
             axis = tuple(np.where(self_shape != np.array(grad.shape))[0])
 
             grad = grad.sum(axis=axis, keepdims=keepdims).reshape(self.data.shape)
-
-        print('Id:', id(self), 'Grad:', grad)
-        print('Final grad:', self.grad + grad)
 
         # Accumulate gradient
         self.grad += grad
