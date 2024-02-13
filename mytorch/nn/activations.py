@@ -39,7 +39,7 @@ class LeakyReLU(Activation):
         self.alpha = alpha
         
     def forward(self, x: Tensor):
-        return x.maximum(x * self.alpha)
+        return Tensor.where(x.data > 0, x, self.alpha * x)
     
 class Tanh(Activation):
     ''' Hyperbolic Tangent activation function. '''

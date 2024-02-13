@@ -25,20 +25,6 @@ class Tensor:
 
         return f'Tensor({self.data}, dtype={self.dtype}, requires_grad={self.requires_grad})'
 
-    @staticmethod
-    def tensor(
-        data: Union['Tensor', ArrayLike], 
-        dtype: Optional[DTypeLike] = None,
-        requires_grad: bool = False,
-        grad_fn: Optional[Callable[[np.ndarray], None]] = None
-    ):
-        ''' Factory function to create a tensor '''
-        
-        if isinstance(data, Tensor):
-            return data
-        
-        return Tensor(data, dtype, requires_grad, grad_fn)
-
     def detach(self):
         ''' Detaches the tensor from the computation graph '''
         
@@ -88,7 +74,7 @@ class Tensor:
     def add(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using t + other '''
 
-        tensor = self.tensor(other)
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
 
         data = self.data + tensor.data
         requires_grad = self.requires_grad or tensor.requires_grad
@@ -109,12 +95,14 @@ class Tensor:
     def __radd__(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using other + t '''
 
-        return self.tensor(other).add(self)
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+
+        return tensor.add(self)
 
     def sub(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using t - other '''
 
-        tensor = self.tensor(other)
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
 
         data = self.data - tensor.data
         requires_grad = self.requires_grad or tensor.requires_grad
@@ -135,12 +123,14 @@ class Tensor:
     def __rsub__(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using other - t '''
 
-        return self.tensor(other).sub(self)
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+
+        return tensor.sub(self)
 
     def mul(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using t * other '''
 
-        tensor = self.tensor(other)
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
 
         data = self.data * tensor.data
         requires_grad = self.requires_grad or tensor.requires_grad
@@ -161,12 +151,14 @@ class Tensor:
     def __rmul__(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using other * t '''
 
-        return self.tensor(other).mul(self)
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+
+        return tensor.mul(self)
 
     def div(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using t / other '''
 
-        tensor = self.tensor(other)
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
 
         data = self.data / tensor.data
         requires_grad = self.requires_grad or tensor.requires_grad
@@ -187,12 +179,14 @@ class Tensor:
     def __rtruediv__(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using other / t '''
 
-        return self.tensor(other).div(self)
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+
+        return tensor.div(self)
 
     def power(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using t ** other '''
 
-        tensor = self.tensor(other)
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
 
         data = self.data ** tensor.data
         requires_grad = self.requires_grad or tensor.requires_grad
@@ -213,16 +207,18 @@ class Tensor:
     def __rpow__(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using other ** t '''
 
-        return self.tensor(other).power(self)
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+
+        return tensor.power(self)
 
     def matmul(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using t @ other '''
 
-        tensor = self.tensor(other)
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        
         data = self.data @ tensor.data
-        grad_fn = None
-
         requires_grad = self.requires_grad or tensor.requires_grad
+        grad_fn = None
 
         if requires_grad:
             def grad_fn(grad: np.ndarray):
@@ -256,7 +252,9 @@ class Tensor:
     def __rmatmul__(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using other @ t '''
 
-        return self.tensor(other).matmul(self)
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+
+        return tensor.matmul(self)
 
     def abs(self):
         ''' Returns the absolute value of the tensor '''
@@ -419,7 +417,7 @@ class Tensor:
     def maximum(self, other: Union['Tensor', ArrayLike]):
         ''' Returns the max values of the tensor '''
 
-        tensor = self.tensor(other)
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
 
         data = np.maximum(self.data, tensor.data)
         requires_grad = self.requires_grad or tensor.requires_grad
@@ -435,7 +433,7 @@ class Tensor:
     def minimum(self, other: Union['Tensor', ArrayLike]):
         ''' Returns the min values of the tensor '''
 
-        tensor = self.tensor(other)
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
 
         data = np.minimum(self.data, tensor.data)
         requires_grad = self.requires_grad or tensor.requires_grad
@@ -485,7 +483,7 @@ class Tensor:
     def concatenate(self, *arrays: Union['Tensor', ArrayLike], axis: SupportsIndex = 0):
         ''' Concatenates the tensors '''
         
-        tensors = [self] + [self.tensor(t) for t in arrays]
+        tensors = [self] + [t if isinstance(t, Tensor) else Tensor(t) for t in arrays]
 
         data = np.concatenate([t.data for t in tensors], axis=axis)
         requires_grad = any(t.requires_grad for t in tensors)
@@ -560,7 +558,99 @@ class Tensor:
                 self.backward(np.flip(grad, axis=axis))
                 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+    
+    def gt(self, other: Union['Tensor', ArrayLike]):
+        ''' Returns the truth value of self > other '''
+        
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        
+        return Tensor(self.data > tensor.data)
+    
+    def __gt__(self, other: Union['Tensor', ArrayLike]):
+        ''' Returns the truth value of self > other '''
+        
+        return self.gt(other)
+    
+    def ge(self, other: Union['Tensor', ArrayLike]):
+        ''' Returns the truth value of self >= other '''
+        
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        
+        return Tensor(self.data >= tensor.data)
+    
+    def __ge__(self, other: Union['Tensor', ArrayLike]):
+        ''' Returns the truth value of self >= other '''
+        
+        return self.ge(other)
+    
+    def lt(self, other: Union['Tensor', ArrayLike]):
+        ''' Returns the truth value of self < other '''
+        
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        
+        return Tensor(self.data < tensor.data)
+    
+    def __lt__(self, other: Union['Tensor', ArrayLike]):
+        ''' Returns the truth value of self < other '''
+        
+        return self.lt(other)
+    
+    def le(self, other: Union['Tensor', ArrayLike]):
+        ''' Returns the truth value of self <= other '''
+        
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        
+        return Tensor(self.data <= tensor.data)
+    
+    def __le__(self, other: Union['Tensor', ArrayLike]):
+        ''' Returns the truth value of self <= other '''
+        
+        return self.le(other)
+    
+    def eq(self, other: Union['Tensor', ArrayLike]):
+        ''' Returns the truth value of self == other '''
+        
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+                
+        return Tensor(self.data == tensor.data)
+    
+    def __eq__(self, other):
+        ''' Returns the truth value of self == other '''
+        
+        return self.eq(other)
+    
+    def ne(self, other: Union['Tensor', ArrayLike]):
+        ''' Returns the truth value of self != other '''
+        
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        
+        return Tensor(self.data != tensor.data)
+    
+    def __ne__(self, other):
+        ''' Returns the truth value of self != other '''
+        
+        return self.ne(other)
+    
+    @staticmethod
+    def where(condition: ArrayLike, x: Union['Tensor', ArrayLike], y: Union['Tensor', ArrayLike]):
+        ''' Returns elements chosen from x or y depending on condition '''
+        
+        condition = np.array(condition, dtype=bool)
 
+        tensor_x = x if isinstance(x, Tensor) else Tensor(x)
+        tensor_y = y if isinstance(y, Tensor) else Tensor(y)
+        
+        data = np.where(condition, tensor_x.data, tensor_y.data)
+        requires_grad = tensor_x.requires_grad or tensor_y.requires_grad
+        grad_fn = None
+        
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                tensor_x.backward(grad * condition)
+                tensor_y.backward(grad * (~condition)) # type: ignore
+        
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+        
     def __iter__(self):
         ''' Returns an iterator over the tensor '''
         
