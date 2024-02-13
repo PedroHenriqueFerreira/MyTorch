@@ -39,7 +39,7 @@ class LeakyReLU(Activation):
         self.alpha = alpha
         
     def forward(self, x: Tensor):
-        return Tensor.where(x.data > 0, x, self.alpha * x)
+        return (x > 0).where(x, self.alpha * x)
     
 class Tanh(Activation):
     ''' Hyperbolic Tangent activation function. '''
@@ -67,35 +67,19 @@ class ELU(Activation):
     
     def __init__(self, alpha: float = 1.0):
         self.alpha = alpha
-        
+         
     def forward(self, x: Tensor):
-        data = np.where(x.data <= 0, self.alpha * (np.exp(x.data) - 1), x.data)
-        requires_grad = x.requires_grad
-        grad_fn = None
-        
-        if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                x.backward(grad * np.where(data <= 0, data + self.alpha, 1))
-                
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+        return (x > 0).where(x, self.alpha * (x.exp() - 1))
     
 class SELU(Activation):
     ''' Scaled Exponential Linear Unit activation function. '''
     
     def __init__(self):
-        self.lmbda = 1.0507009873554804934193349852946
+        self.scale = 1.0507009873554804934193349852946
         self.alpha = 1.6732632423543772848170429916717
         
     def forward(self, x: Tensor):
-        data = self.lmbda * np.where(x.data <= 0, self.alpha * (np.exp(x.data) - 1), x.data)
-        requires_grad = x.requires_grad
-        grad_fn = None
-        
-        if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                x.backward(grad * self.lmbda * np.where(data <= 0, self.alpha * np.exp(x.data), 1))
-                
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+        return self.scale * (x > 0).where(x, self.alpha * (x.exp() - 1))
     
 class GELU(Activation):
     ''' Gaussian Error Linear Unit activation function. '''

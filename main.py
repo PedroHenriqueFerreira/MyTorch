@@ -1,6 +1,6 @@
-from mytorch.nn.activations import LeakyReLU as func
-from torch.nn import LeakyReLU as torch_func
-import torch 
+from mytorch.nn.activations import SELU as func
+from torch.nn import SELU as torch_func
+import torch
 
 from mytorch.autograd import Tensor
 

@@ -631,23 +631,20 @@ class Tensor:
         
         return self.ne(other)
     
-    @staticmethod
-    def where(condition: ArrayLike, x: Union['Tensor', ArrayLike], y: Union['Tensor', ArrayLike]):
+    def where(self, x: Union['Tensor', ArrayLike], y: Union['Tensor', ArrayLike]):
         ''' Returns elements chosen from x or y depending on condition '''
         
-        condition = np.array(condition, dtype=bool)
-
         tensor_x = x if isinstance(x, Tensor) else Tensor(x)
         tensor_y = y if isinstance(y, Tensor) else Tensor(y)
         
-        data = np.where(condition, tensor_x.data, tensor_y.data)
+        data = np.where(self.data, tensor_x.data, tensor_y.data)
         requires_grad = tensor_x.requires_grad or tensor_y.requires_grad
         grad_fn = None
         
         if requires_grad:
             def grad_fn(grad: np.ndarray):
-                tensor_x.backward(grad * condition)
-                tensor_y.backward(grad * (~condition)) # type: ignore
+                tensor_x.backward(grad * self.data)
+                tensor_y.backward(grad * ~self.data)
         
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
         
