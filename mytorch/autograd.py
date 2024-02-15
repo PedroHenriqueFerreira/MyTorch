@@ -559,6 +559,8 @@ class Tensor:
                 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
     
+    # Start no grad
+    
     def gt(self, other: Union['Tensor', ArrayLike]):
         ''' Returns the truth value of self > other '''
         
@@ -631,6 +633,8 @@ class Tensor:
         
         return self.ne(other)
     
+    # End no grad
+    
     def where(self, x: Union['Tensor', ArrayLike], y: Union['Tensor', ArrayLike]):
         ''' Returns elements chosen from x or y depending on condition '''
         
@@ -656,6 +660,9 @@ class Tensor:
 
     def __getitem__(self, key):
         ''' Gets called when using t[key] '''
+        
+        if isinstance(key, Tensor):
+            key = key.data
         
         data = self.data[key]
         requires_grad = self.requires_grad
