@@ -606,23 +606,19 @@ class Tensor:
                 tensor_y.backward(grad * ~self.data)
         
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
-        
-    def iter(self):
-        ''' Returns an iterator over the tensor '''
-        
-        for i in range(self.data.shape[0]):
-            yield self[i]
-        
-    def __iter__(self):
-        ''' Returns an iterator over the tensor '''
-        
-        return self.iter()
-
+      
     def getitem(self, key):
         ''' Gets called when using t[key] '''
         
         if isinstance(key, Tensor):
             key = key.data
+        
+        if isinstance(key, (list, tuple)):
+            key = list(key)
+            
+            for i, item in enumerate(key):
+                if isinstance(item, Tensor):
+                    key[i] = item.data
         
         data = self.data[key]
         requires_grad = self.requires_grad
@@ -640,7 +636,34 @@ class Tensor:
     def __getitem__(self, key):
         ''' Gets called when using t[key] '''
         
-        return self.getitem(key)
+        return self.getitem(key)  
+      
+    def setitem(self, key, value):
+        ''' Gets called when using t[key] = value '''
+        
+        if isinstance(key, Tensor):
+            key = key.data
+        
+        if isinstance(value, Tensor):
+            value = value.data
+        
+        self.data[key] = value
+        
+    def __setitem__(self, key, value):
+        ''' Gets called when using t[key] = value '''
+        
+        self.setitem(key, value)
+      
+    def iter(self):
+        ''' Returns an iterator over the tensor '''
+        
+        for i in range(self.data.shape[0]):
+            yield self.getitem(i)
+        
+    def __iter__(self):
+        ''' Returns an iterator over the tensor '''
+        
+        return self.iter()
     
     def gt(self, other: Union['Tensor', ArrayLike]):
         ''' Returns the truth value of self > other '''
@@ -735,16 +758,16 @@ class Tensor:
         return self.data.ndim
     
     @property
-    def T(self):
-        ''' Returns the transpose of the tensor '''
-        
-        return self.transpose()
-
-    @property
     def dtype(self):
         ''' Returns the data type of the tensor '''
         
         return self.data.dtype
+    
+    @property
+    def T(self):
+        ''' Returns the transpose of the tensor '''
+        
+        return self.transpose()
 
     # End properties
 

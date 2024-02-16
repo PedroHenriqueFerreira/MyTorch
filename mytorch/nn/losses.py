@@ -1,21 +1,19 @@
+import mytorch as mt
+from mytorch.nn import Softmax
+
 from abc import ABC, abstractmethod
 from typing import Optional, Literal
-from numpy._typing import ArrayLike
-
-from mytorch.autograd import Tensor
-
-import numpy as np
 
 class Loss(ABC):
     ''' Base class for all loss functions. '''
     
     @abstractmethod
-    def forward(self, p: Tensor, y: Tensor) -> Tensor:
+    def forward(self, p: mt.Tensor, y: mt.Tensor) -> mt.Tensor:
         ''' Forward pass. '''
         
         pass
     
-    def __call__(self, p: Tensor, y: Tensor) -> Tensor:
+    def __call__(self, p: mt.Tensor, y: mt.Tensor) -> mt.Tensor:
         ''' When the object is called, it calls the forward method. '''
         
         return self.forward(p, y)    
@@ -26,13 +24,13 @@ class L1Loss(Loss):
     def __init__(self, reduction: Literal['mean', 'sum', 'none'] = 'mean'):
         self.reduction = reduction
     
-    def forward(self, p: Tensor, y: Tensor) -> Tensor:
-        loss = (p - y).abs()
+    def forward(self, p: mt.Tensor, y: mt.Tensor):
+        loss = mt.abs(p - y)
         
         if self.reduction == 'mean':
-            return loss.mean()
+            return mt.mean(loss)
         elif self.reduction == 'sum':
-            return loss.sum()
+            return mt.sum(loss)
         else:
             return loss
     
@@ -42,13 +40,13 @@ class MSELoss(Loss):
     def __init__(self, reduction: Literal['mean', 'sum', 'none'] = 'mean'):
         self.reduction = reduction
     
-    def forward(self, p: Tensor, y: Tensor) -> Tensor:
+    def forward(self, p: mt.Tensor, y: mt.Tensor):
         loss = (p - y) ** 2
         
         if self.reduction == 'mean':
-            return loss.mean()
+            return mt.mean(loss)
         elif self.reduction == 'sum':
-            return loss.sum()
+            return mt.sum(loss)
         else:
             return loss
         
@@ -57,22 +55,22 @@ class BCELoss(Loss):
     
     def __init__(
         self, 
-        weight: Optional[Tensor] = None,
+        weight: Optional[mt.Tensor] = None,
         reduction: Literal['mean', 'sum', 'none'] = 'mean'
     ):
         self.weight = weight
         self.reduction = reduction
     
-    def forward(self, p: Tensor, y: Tensor) -> Tensor:
+    def forward(self, p: mt.Tensor, y: mt.Tensor):
         if self.weight is None:
-            self.weight = Tensor(1)
+            self.weight = mt.ones(p.shape[0])
         
-        loss = -self.weight * (y * p.log() + (1 - y) * (1 - p).log())
+        loss = -self.weight * (y * mt.log(p) + (1 - y) * mt.log(1 - p))
         
         if self.reduction == 'mean':
-            return loss.mean()
+            return mt.mean(loss)
         elif self.reduction == 'sum':
-            return loss.sum()
+            return mt.sum(loss)
         else:
             return loss
         
@@ -87,16 +85,17 @@ class HuberLoss(Loss):
         self.delta = delta
         self.reduction = reduction
     
-    def forward(self, p: Tensor, y: Tensor) -> Tensor:
-        loss = ((p - y).abs() < self.delta).where(
+    def forward(self, p: mt.Tensor, y: mt.Tensor):
+        loss = mt.where(
+            mt.abs(p - y) < self.delta,
             0.5 * (p - y) ** 2, 
-            self.delta * ((p - y).abs() - 0.5 * self.delta)
+            self.delta * (mt.abs(p - y) - 0.5 * self.delta)
         )
         
         if self.reduction == 'mean':
-            return loss.mean()
+            return mt.mean(loss)
         elif self.reduction == 'sum':
-            return loss.sum()
+            return mt.sum(loss)
         else:
             return loss
 
@@ -111,18 +110,18 @@ class KLDivLoss(Loss):
         self.log_target = log_target
         self.reduction = reduction
         
-    def forward(self, p: Tensor, y: Tensor) -> Tensor:
+    def forward(self, p: mt.Tensor, y: mt.Tensor):
         if not self.log_target:
-            loss = y * (y.log() - p)
+            loss = y * (mt.log(y) - p)
         else:
-            loss = y.exp() * (y - p)
+            loss = mt.exp(y) * (y - p)
         
         if self.reduction == 'mean':
-            return loss.mean()
+            return mt.mean(loss)
         elif self.reduction == 'batchmean':
-            return loss.sum() / p.shape[0]
+            return mt.sum(loss) / p.shape[0]
         elif self.reduction == 'sum':
-            return loss.sum()
+            return mt.sum(loss)
         else:
             return loss
         
@@ -131,7 +130,7 @@ class NLLLoss(Loss):
     
     def __init__(
         self,
-        weight: Optional[Tensor] = None, 
+        weight: Optional[mt.Tensor] = None, 
         ignore_index: int = -100, 
         reduction: Literal['mean', 'sum', 'none'] = 'mean'
     ):
@@ -139,26 +138,45 @@ class NLLLoss(Loss):
         self.ignore_index = ignore_index
         self.reduction = reduction
         
-    def forward(self, p: Tensor, y: Tensor):
+    def forward(self, p: mt.Tensor, y: mt.Tensor):
         if self.weight is None:
-            self.weight = Tensor(np.ones(p.shape[1])) # TODO: create tensor ones
-            
+            self.weight = mt.ones(p.shape[1])
+        
         if p.ndim == 2:
             p = p[..., None]
 
         if y.ndim == 1:
             y = y[..., None]
         
-        indices = np.indices(y.shape, sparse=True)
-        criterion = (indices[0], y.data, *indices[1:])
+        indices = mt.indices(y.shape, sparse=True)
+        criterion = (indices[0], y, *indices[1:])
         
         weight = self.weight[y] * (y != self.ignore_index)
         
         loss = -weight * p[criterion]
         
         if self.reduction == 'mean':
-            return (loss / weight.sum()).sum()
+            return mt.sum(loss / mt.sum(weight))
         elif self.reduction == 'sum':
-            return loss.sum()
+            return mt.sum(loss)
         else:
             return loss
+        
+class CrossEntroyLoss(Loss):
+    ''' Cross Entropy Loss. '''
+    
+    def __init__(
+        self,
+        weight: Optional[mt.Tensor] = None, 
+        ignore_index: int = -100, 
+        reduction: Literal['mean', 'sum', 'none'] = 'mean'
+    ):
+        self.weight = weight
+        self.ignore_index = ignore_index
+        self.reduction = reduction
+        
+        self.softmax = Softmax(axis=1)
+        self.nll_loss = NLLLoss(weight, ignore_index, reduction)
+        
+    def forward(self, p: mt.Tensor, y: mt.Tensor):
+        return self.nll_loss(mt.log(self.softmax(p)), y)

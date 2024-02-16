@@ -1,6 +1,7 @@
 import mytorch
 
 from abc import ABC, abstractmethod
+
 from math import pi, sqrt
 
 class Activation(ABC):
@@ -24,7 +25,6 @@ class Sigmoid(Activation):
     def forward(self, x: mytorch.Tensor):
         return 1 / (1 + mytorch.exp(-x))
 
-
 class ReLU(Activation):
     ''' Rectified Linear Unit activation function. '''
 
@@ -46,7 +46,6 @@ class Tanh(Activation):
     def forward(self, x: mytorch.Tensor):
         return mytorch.tanh(x)
 
-
 class Softplus(Activation):
     ''' Softplus activation function. '''
 
@@ -60,7 +59,7 @@ class Softsign(Activation):
     ''' Softsign activation function. '''
 
     def forward(self, x: mytorch.Tensor):
-        return x / (1 + abs(x))
+        return x / (1 + mytorch.abs(x))
 
 class ELU(Activation):
     ''' Exponential Linear Unit activation function. '''
