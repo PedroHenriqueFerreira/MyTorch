@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 
-from mytorch.autograd import Tensor
-
-import numpy as np
+from mytorch import Tensor
 
 from math import pi, sqrt
 
@@ -23,7 +21,7 @@ class Activation(ABC):
 class Sigmoid(Activation):
     ''' Sigmoid activation function. '''
     
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor):
         return 1 / (1 + (-x).exp())
     
 class ReLU(Activation):

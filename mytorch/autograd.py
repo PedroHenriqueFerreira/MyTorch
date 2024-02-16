@@ -17,9 +17,6 @@ class Tensor:
 
         self.grad: Optional[np.ndarray] = None
 
-        if self.requires_grad:
-            self.zero_grad()
-
     def __repr__(self):
         ''' Returns a string representation of the tensor '''
 
@@ -195,37 +192,6 @@ class Tensor:
 
         return tensor.div(self)
 
-    def power(self, other: Union['Tensor', ArrayLike]):
-        ''' Gets called when using t ** other '''
-
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
-
-        data = self.data ** tensor.data
-        requires_grad = self.requires_grad or tensor.requires_grad
-        grad_fn = None
-
-        if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                if self.requires_grad:
-                    self.backward(grad * tensor.data * self.data ** (tensor.data - 1))
-                    
-                if tensor.requires_grad:
-                    tensor.backward(grad * np.log(self.data) * data)
-
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
-
-    def __pow__(self, other: Union['Tensor', ArrayLike]):
-        ''' Gets called when using t ** other '''
-
-        return self.power(other)
-
-    def __rpow__(self, other: Union['Tensor', ArrayLike]):
-        ''' Gets called when using other ** t '''
-
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
-
-        return tensor.power(self)
-
     def matmul(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using t @ other '''
 
@@ -283,6 +249,37 @@ class Tensor:
 
         return tensor.matmul(self)
 
+    def power(self, other: Union['Tensor', ArrayLike]):
+        ''' Gets called when using t ** other '''
+
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+
+        data = self.data ** tensor.data
+        requires_grad = self.requires_grad or tensor.requires_grad
+        grad_fn = None
+
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                if self.requires_grad:
+                    self.backward(grad * tensor.data * self.data ** (tensor.data - 1))
+                    
+                if tensor.requires_grad:
+                    tensor.backward(grad * np.log(self.data) * data)
+
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+
+    def __pow__(self, other: Union['Tensor', ArrayLike]):
+        ''' Gets called when using t ** other '''
+
+        return self.power(other)
+
+    def __rpow__(self, other: Union['Tensor', ArrayLike]):
+        ''' Gets called when using other ** t '''
+
+        tensor = other if isinstance(other, Tensor) else Tensor(other)
+
+        return tensor.power(self)
+
     def abs(self):
         ''' Returns the absolute value of the tensor '''
 
@@ -300,68 +297,6 @@ class Tensor:
         ''' Returns the absolute value of the tensor '''
         
         return self.abs()
-
-    def sum(self, axis: Optional[_ShapeLike] = None, keepdims: bool = False):
-        ''' Returns the sum of the tensor '''
-
-        data = self.data.sum(axis=axis, keepdims=keepdims)
-        requires_grad = self.requires_grad
-        grad_fn = None
-
-        if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                # Expand gradient to match data shape
-                if self.data.ndim != grad.ndim and axis is not None:
-                    grad = np.expand_dims(grad, axis)
-
-                self.backward(grad * np.ones(self.data.shape))
-
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
-
-    def mean(self, axis: Optional[_ShapeLike] = None, keepdims: bool = False):
-        ''' Returns the mean of the tensor '''
-
-        data = self.data.mean(axis=axis, keepdims=keepdims)
-        requires_grad = self.requires_grad
-        grad_fn = None
-
-        if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                # Expand gradient to match data shape
-                if self.data.ndim != grad.ndim and axis is not None:
-                    grad = np.expand_dims(grad, axis)
-
-                # Compute size of the mean
-                axis_ = list(axis) if isinstance(axis, tuple) else axis
-                size = np.prod(np.array(self.data.shape)[axis_]) # type: ignore
-
-                self.backward(grad * np.ones(self.data.shape) / size)
-
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
-
-    def var(self, axis: Optional[_ShapeLike] = None, keepdims: bool = False):
-        ''' Returns the variance of the tensor '''
-
-        data = self.data.var(axis=axis, keepdims=keepdims)
-        requires_grad = self.requires_grad
-        grad_fn = None
-
-        if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                # Expand gradient to match data shape
-                if self.data.ndim != grad.ndim and axis is not None:
-                    grad = np.expand_dims(grad, axis)
-
-                # Compute size of the variance
-                axis_ = list(axis) if isinstance(axis, tuple) else axis
-                size = np.prod(np.array(self.data.shape)[axis_]) # type: ignore
-
-                # Compute mean
-                mean = self.data.mean(axis=axis, keepdims=True)
-
-                self.backward(grad * np.ones(self.data.shape) * 2 * (self.data - mean) / size)
-
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def sqrt(self):
         ''' Returns the square root of the tensor '''
@@ -438,6 +373,68 @@ class Tensor:
         if requires_grad:
             def grad_fn(grad: np.ndarray):
                 self.backward(grad * -np.sin(self.data))
+
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+
+    def sum(self, axis: Optional[_ShapeLike] = None, keepdims: bool = False):
+        ''' Returns the sum of the tensor '''
+
+        data = self.data.sum(axis=axis, keepdims=keepdims)
+        requires_grad = self.requires_grad
+        grad_fn = None
+
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                # Expand gradient to match data shape
+                if self.data.ndim != grad.ndim and axis is not None:
+                    grad = np.expand_dims(grad, axis)
+
+                self.backward(grad * np.ones(self.data.shape))
+
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+
+    def mean(self, axis: Optional[_ShapeLike] = None, keepdims: bool = False):
+        ''' Returns the mean of the tensor '''
+
+        data = self.data.mean(axis=axis, keepdims=keepdims)
+        requires_grad = self.requires_grad
+        grad_fn = None
+
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                # Expand gradient to match data shape
+                if self.data.ndim != grad.ndim and axis is not None:
+                    grad = np.expand_dims(grad, axis)
+
+                # Compute size of the mean
+                axis_ = list(axis) if isinstance(axis, tuple) else axis
+                size = np.prod(np.array(self.data.shape)[axis_]) # type: ignore
+
+                self.backward(grad * np.ones(self.data.shape) / size)
+
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+
+    def var(self, axis: Optional[_ShapeLike] = None, keepdims: bool = False):
+        ''' Returns the variance of the tensor '''
+
+        data = self.data.var(axis=axis, keepdims=keepdims)
+        requires_grad = self.requires_grad
+        grad_fn = None
+
+        if requires_grad:
+            def grad_fn(grad: np.ndarray):
+                # Expand gradient to match data shape
+                if self.data.ndim != grad.ndim and axis is not None:
+                    grad = np.expand_dims(grad, axis)
+
+                # Compute size of the variance
+                axis_ = list(axis) if isinstance(axis, tuple) else axis
+                size = np.prod(np.array(self.data.shape)[axis_]) # type: ignore
+
+                # Compute mean
+                mean = self.data.mean(axis=axis, keepdims=True)
+
+                self.backward(grad * np.ones(self.data.shape) * 2 * (self.data - mean) / size)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
@@ -645,8 +642,6 @@ class Tensor:
         
         return self.getitem(key)
     
-    # No grad
-    
     def gt(self, other: Union['Tensor', ArrayLike]):
         ''' Returns the truth value of self > other '''
         
@@ -754,7 +749,7 @@ class Tensor:
     # End properties
 
     def backward(self, grad: Optional[ArrayLike] = None):
-        if not self.requires_grad or self.grad is None:
+        if not self.requires_grad:
             return
 
         # Initialize gradient if not provided
@@ -776,115 +771,11 @@ class Tensor:
 
             grad = grad.sum(axis=axis, keepdims=keepdims).reshape(self.data.shape)
 
-        # Accumulate gradient
-        self.grad += grad
+        if self.grad is None:
+            self.grad = grad # type: ignore
+        else:
+            # Accumulate gradient
+            self.grad += grad
 
         if self.grad_fn is not None:
             self.grad_fn(grad) # type: ignore
-
-# Typings
-int16 = np.int16
-int32 = np.int32
-int64 = np.int64
-float16 = np.float16
-float32 = np.float32
-float64 = np.float64
-
-# Factories for creating tensors
-
-def tensor(data: ArrayLike,  dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(data, dtype=dtype, requires_grad=requires_grad)
-
-def ones(shape: _ShapeLike, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.ones(shape, dtype=dtype), requires_grad=requires_grad)
-
-def ones_like(tensor: Tensor, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.ones_like(tensor.data, dtype=dtype), requires_grad=requires_grad)
-
-def zeros(shape: _ShapeLike, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.zeros(shape, dtype=dtype), requires_grad=requires_grad)
-
-def zeros_like(tensor: Tensor, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.zeros_like(tensor.data, dtype=dtype), requires_grad=requires_grad)
-
-def rand(*shape: int, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.random.rand(*shape).astype(dtype), requires_grad=requires_grad)
-
-def randn(*shape: int, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.random.randn(*shape).astype(dtype), requires_grad=requires_grad)
-
-def argmin(tensor: Tensor, axis: Optional[_ShapeLike] = None, keepdims = False):
-    return Tensor(np.argmin(tensor.data, axis=axis, keepdims=keepdims)) # type: ignore
-
-def argmax(tensor: Tensor, axis: Optional[_ShapeLike] = None, keepdims = False):
-    return Tensor(np.argmax(tensor.data, axis=axis, keepdims=keepdims)) # type: ignore
-
-def arange(
-    start = 0, 
-    stop = 0, 
-    step = 1, 
-    dtype: DTypeLike = None, 
-    requires_grad = False
-):
-    return Tensor(np.arange(start, stop, step, dtype=dtype), requires_grad=requires_grad)
-
-# Operations
-
-def sum(tensor: Tensor, axis: Optional[_ShapeLike] = None, keepdims = False):
-    return tensor.sum(axis=axis, keepdims=keepdims)
-
-def mean(tensor: Tensor, axis: Optional[_ShapeLike] = None, keepdims = False):
-    return tensor.mean(axis=axis, keepdims=keepdims)
-
-def var(tensor: Tensor, axis: Optional[_ShapeLike] = None, keepdims = False):
-    return tensor.var(axis=axis, keepdims=keepdims)
-
-def sqrt(tensor: Tensor):
-    return tensor.sqrt()
-
-def log(tensor: Tensor):
-    return tensor.log()
-
-def exp(tensor: Tensor):
-    return tensor.exp()
-
-def tanh(tensor: Tensor):
-    return tensor.tanh()
-
-def sin(tensor: Tensor):
-    return tensor.sin()
-
-def cos(tensor: Tensor):
-    return tensor.cos()
-
-def abs(tensor: Tensor):
-    return tensor.abs()
-
-def maximum(tensor: Tensor, other: Union[ArrayLike, 'Tensor']):
-    return tensor.maximum(other)
-
-def minimum(tensor: Tensor, other: Union[ArrayLike, 'Tensor']):
-    return tensor.minimum(other)
-
-def max(tensor: Tensor, axis: Optional[_ShapeLike] = None, keepdims = False):
-    return tensor.max(axis=axis, keepdims=keepdims)
-
-def min(tensor: Tensor, axis: Optional[_ShapeLike] = None, keepdims = False):
-    return tensor.min(axis=axis, keepdims=keepdims)
-
-def concatenate(*tensors: Union[ArrayLike, 'Tensor'], axis: SupportsIndex = 0):
-    tensor = tensors[0] if isinstance(tensors[0], Tensor) else Tensor(tensors[0])
-    
-    return tensor.concatenate(*tensors[1:], axis=axis)
-
-def reshape(tensor: Tensor, shape: _ShapeLike):
-    return tensor.reshape(shape)
-
-def transpose(tensor: Tensor, axes: Optional[_ShapeLike] = None):
-    return tensor.transpose(axes=axes)
-
-def swapaxes(tensor: Tensor, axis1: SupportsIndex, axis2: SupportsIndex):
-    return tensor.swapaxes(axis1, axis2)
-
-def flip(tensor: Tensor, axis: Optional[_ShapeLike] = None):
-    return tensor.flip(axis=axis)
