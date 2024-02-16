@@ -614,12 +614,19 @@ class Tensor:
             key = key.data
         
         if isinstance(key, (list, tuple)):
-            key = list(key)
+            new_key = []
             
-            for i, item in enumerate(key):
+            for item in key:
                 if isinstance(item, Tensor):
-                    key[i] = item.data
-        
+                    new_key.append(item.data)
+                else:
+                    new_key.append(item)
+                    
+            if isinstance(key, tuple):
+                key = tuple(new_key)
+            else:
+                key = new_key
+            
         data = self.data[key]
         requires_grad = self.requires_grad
         grad_fn = None

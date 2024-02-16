@@ -1,25 +1,36 @@
-from mytorch.nn.losses import NLLLoss as func
-from torch.nn import NLLLoss as torch_func
-import torch
+from mytorch.nn import Sequential, Linear, ReLU, Sigmoid, BCELoss
+from mytorch.optim import Adam
 
-from mytorch.autograd import Tensor
+import mytorch as mt
 
-import numpy as np
+nn = Sequential(
+    Linear(2, 2),
+    ReLU(),
+    Linear(2, 2),
+    ReLU(),
+    Linear(2, 2),
+    ReLU(),
+    Linear(2, 1),
+    Sigmoid(),
+)
 
-t1 = Tensor(np.array([[0.6, 0.4], [0.8, 0.2], [0.1, 0.8]]), requires_grad=True)
-t2 = torch.tensor([[0.6, 0.4], [0.8, 0.2], [0.1, 0.8]], requires_grad=True)
+optimizer = Adam(nn.parameters(), lr=0.01)
+loss = BCELoss()
 
-f = func(weight=Tensor([0.3, 0.7]))
-torch_f = torch_func(weight=torch.tensor([0.3, 0.7]))
-
-y = f(t1, Tensor(np.array([1, 0, 1])))
-torch_y = torch_f(t2, torch.tensor([1, 0, 1]))
-
-print(y)
-print(torch_y)
-
-y.backward()
-torch_y.backward(torch.ones_like(torch_y))
-
-print(t1.grad)
-print(t2.grad)
+x = mt.tensor([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=mt.float32)
+y = mt.tensor([[0], [1], [1], [0]], dtype=mt.float32)
+ 
+# Training loop
+for i in range(1000000):
+    optimizer.zero_grad()
+    
+    p = nn(x)
+    
+    l = loss(p, y)
+    
+    l.backward()
+    
+    optimizer.step()
+    
+    if i % 10 == 0:
+        print(f'Epoch {i}, Loss {l.data}')

@@ -37,6 +37,15 @@ def rand(*shape: int, dtype: DTypeLike = None, requires_grad = False):
 def randn(*shape: int, dtype: DTypeLike = None, requires_grad = False):
     return Tensor(np.random.randn(*shape), dtype=dtype, requires_grad=requires_grad)
 
+def uniform(
+    low: float, 
+    high: float, 
+    shape: Optional[_ShapeLike] = None, 
+    dtype: DTypeLike = None,
+    requires_grad = False
+):
+    return Tensor(np.random.uniform(low, high, shape), dtype=dtype, requires_grad=requires_grad)
+
 def argmax(tensor: Tensor, axis: Optional[_ShapeLike] = None, keepdims = False):
     return Tensor(np.argmax(tensor.data, axis=axis, keepdims=keepdims)) # type: ignore
 

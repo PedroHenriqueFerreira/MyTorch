@@ -1,4 +1,4 @@
-import mytorch
+import mytorch as mt
 
 from abc import ABC, abstractmethod
 
@@ -8,12 +8,12 @@ class Activation(ABC):
     ''' Base class for all loss functions. '''
 
     @abstractmethod
-    def forward(self, x: mytorch.Tensor) -> mytorch.Tensor:
+    def forward(self, x: mt.Tensor) -> mt.Tensor:
         ''' Forward pass. '''
 
         pass
 
-    def __call__(self, x: mytorch.Tensor) -> mytorch.Tensor:
+    def __call__(self, x: mt.Tensor) -> mt.Tensor:
         ''' When the object is called, it calls the forward method. '''
 
         return self.forward(x)
@@ -22,14 +22,14 @@ class Activation(ABC):
 class Sigmoid(Activation):
     ''' Sigmoid activation function. '''
 
-    def forward(self, x: mytorch.Tensor):
-        return 1 / (1 + mytorch.exp(-x))
+    def forward(self, x: mt.Tensor):
+        return 1 / (1 + mt.exp(-x))
 
 class ReLU(Activation):
     ''' Rectified Linear Unit activation function. '''
 
-    def forward(self, x: mytorch.Tensor):
-        return mytorch.maximum(x, 0)
+    def forward(self, x: mt.Tensor):
+        return mt.maximum(x, 0)
 
 class LeakyReLU(Activation):
     ''' Leaky Rectified Linear Unit activation function. '''
@@ -37,14 +37,14 @@ class LeakyReLU(Activation):
     def __init__(self, alpha: float = 0.01):
         self.alpha = alpha
 
-    def forward(self, x: mytorch.Tensor):
-        return mytorch.where(x > 0, x, self.alpha * x)
+    def forward(self, x: mt.Tensor):
+        return mt.where(x > 0, x, self.alpha * x)
 
 class Tanh(Activation):
     ''' Hyperbolic Tangent activation function. '''
 
-    def forward(self, x: mytorch.Tensor):
-        return mytorch.tanh(x)
+    def forward(self, x: mt.Tensor):
+        return mt.tanh(x)
 
 class Softplus(Activation):
     ''' Softplus activation function. '''
@@ -52,14 +52,14 @@ class Softplus(Activation):
     def __init__(self, beta: float = 1):
         self.beta = beta
 
-    def forward(self, x: mytorch.Tensor):
-        return (1 / self.beta) * mytorch.log(1 + mytorch.exp(self.beta * x))
+    def forward(self, x: mt.Tensor):
+        return (1 / self.beta) * mt.log(1 + mt.exp(self.beta * x))
 
 class Softsign(Activation):
     ''' Softsign activation function. '''
 
-    def forward(self, x: mytorch.Tensor):
-        return x / (1 + mytorch.abs(x))
+    def forward(self, x: mt.Tensor):
+        return x / (1 + mt.abs(x))
 
 class ELU(Activation):
     ''' Exponential Linear Unit activation function. '''
@@ -67,8 +67,8 @@ class ELU(Activation):
     def __init__(self, alpha: float = 1.0):
         self.alpha = alpha
 
-    def forward(self, x: mytorch.Tensor):
-        return mytorch.where(x > 0, x, self.alpha * (mytorch.exp(x) - 1))
+    def forward(self, x: mt.Tensor):
+        return mt.where(x > 0, x, self.alpha * (mt.exp(x) - 1))
 
 class SELU(Activation):
     ''' Scaled Exponential Linear Unit activation function. '''
@@ -77,14 +77,14 @@ class SELU(Activation):
         self.scale = 1.0507009873554804934193349852946
         self.alpha = 1.6732632423543772848170429916717
 
-    def forward(self, x: mytorch.Tensor):
-        return self.scale * mytorch.where(x > 0, x, self.alpha * (mytorch.exp(x) - 1))
+    def forward(self, x: mt.Tensor):
+        return self.scale * mt.where(x > 0, x, self.alpha * (mt.exp(x) - 1))
 
 class GELU(Activation):
     ''' Gaussian Error Linear Unit activation function. '''
 
-    def forward(self, x: mytorch.Tensor):
-        return 0.5 * x * (1 + mytorch.tanh(sqrt(2 / pi) * (x + 0.044715 * x ** 3)))
+    def forward(self, x: mt.Tensor):
+        return 0.5 * x * (1 + mt.tanh(sqrt(2 / pi) * (x + 0.044715 * x ** 3)))
 
 class Softmax(Activation):
     ''' Softmax activation function. '''
@@ -92,7 +92,7 @@ class Softmax(Activation):
     def __init__(self, axis: int = 1):
         self.axis = axis
 
-    def forward(self, x: mytorch.Tensor):
-        e_x = mytorch.exp(x - mytorch.max(x, axis=self.axis, keepdims=True))
+    def forward(self, x: mt.Tensor):
+        e_x = mt.exp(x - mt.max(x, axis=self.axis, keepdims=True))
 
-        return e_x / mytorch.sum(e_x, axis=self.axis, keepdims=True)
+        return e_x / mt.sum(e_x, axis=self.axis, keepdims=True)

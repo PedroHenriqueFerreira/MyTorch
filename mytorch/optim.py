@@ -49,9 +49,9 @@ class SGD(Optimizer):
             self.m[i] = self.momentum * self.m[i] + self.lr * param.grad
                 
             if self.nesterov:
-                param -= self.momentum * self.m[i] + self.lr * param.grad
+                param.data -= self.momentum * self.m[i] + self.lr * param.grad
             else:
-                param -= self.m[i]
+                param.data -= self.m[i]
 
 class Adagrad:
     ''' Adaptive Gradient optimizer. '''
@@ -77,7 +77,7 @@ class Adagrad:
             
             self.v[i] += param.grad ** 2
             
-            param -= self.lr * param.grad / (np.sqrt(self.v[i]) + self.eps)
+            param.data -= self.lr * param.grad / (np.sqrt(self.v[i]) + self.eps)
 
 class RMSProp:
     ''' Root Mean Square Propagation optimizer. '''
@@ -105,7 +105,7 @@ class RMSProp:
             
             self.v[i] = self.alpha * self.v[i] + (1 - self.alpha) * param.grad ** 2
             
-            param -= self.lr * param.grad / (np.sqrt(self.v[i]) + self.eps)
+            param.data -= self.lr * param.grad / (np.sqrt(self.v[i]) + self.eps)
 
 class Adadelta:
     ''' Adaptive Delta optimizer. '''
@@ -136,7 +136,7 @@ class Adadelta:
             delta = np.sqrt(self.u[i] + self.eps) / np.sqrt(self.v[i] + self.eps) * param.grad
             self.u[i] = self.rho * self.u[i] + (1 - self.rho) * delta ** 2
             
-            param -= self.lr * delta
+            param.data -= self.lr * delta
 
 class Adam(Optimizer):
     ''' Adaptive Moment Estimation optimizer. '''
@@ -173,7 +173,7 @@ class Adam(Optimizer):
             m_hat = self.m[i] / (1 - self.betas[0] ** self.t)
             v_hat = self.v[i] / (1 - self.betas[1] ** self.t)
             
-            param -= self.lr * m_hat / (np.sqrt(v_hat) + self.eps)
+            param.data -= self.lr * m_hat / (np.sqrt(v_hat) + self.eps)
     
 class Adamax(Optimizer):
     ''' Adam with infinity norm. '''
@@ -209,4 +209,4 @@ class Adamax(Optimizer):
             
             m_hat = self.m[i] / (1 - self.betas[0] ** self.t)
             
-            param -= self.lr * m_hat / (self.u[i] + self.eps)
+            param.data -= self.lr * m_hat / (self.u[i] + self.eps)
