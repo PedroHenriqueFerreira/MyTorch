@@ -1,36 +1,31 @@
-from mytorch.nn import Sequential, Linear, ReLU, Sigmoid, BCELoss
+from mytorch.nn import Sequential, Linear, Sigmoid, BCELoss
 from mytorch.optim import Adam
 
-import mytorch as mt
+import mytorch
 
-nn = Sequential(
+xor = Sequential(
     Linear(2, 2),
-    ReLU(),
-    Linear(2, 2),
-    ReLU(),
-    Linear(2, 2),
-    ReLU(),
-    Linear(2, 1),
     Sigmoid(),
+    Linear(2, 1),
+    Sigmoid()
 )
 
-optimizer = Adam(nn.parameters(), lr=0.01)
-loss = BCELoss()
+optimizer = Adam(xor.parameters())
+loss_func = BCELoss()
 
-x = mt.tensor([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=mt.float32)
-y = mt.tensor([[0], [1], [1], [0]], dtype=mt.float32)
- 
+x = mytorch.tensor([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=mytorch.float32)
+y = mytorch.tensor([[0], [1], [1], [0]], dtype=mytorch.float32)
+
 # Training loop
 for i in range(1000000):
     optimizer.zero_grad()
-    
-    p = nn(x)
-    
-    l = loss(p, y)
-    
-    l.backward()
-    
+
+    predict = xor(x)
+
+    loss = loss_func(predict, y)
+
+    loss.backward()
+
     optimizer.step()
-    
-    if i % 10 == 0:
-        print(f'Epoch {i}, Loss {l.data}')
+
+    print(f'Result: {predict.data}, Epoch {i}, Loss {loss.data}')

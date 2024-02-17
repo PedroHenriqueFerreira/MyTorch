@@ -187,7 +187,7 @@ class Tensor:
 
     def __rtruediv__(self, other: Union['Tensor', ArrayLike]):
         ''' Gets called when using other / t '''
-
+    
         tensor = other if isinstance(other, Tensor) else Tensor(other)
 
         return tensor.div(self)
@@ -314,7 +314,8 @@ class Tensor:
     def log(self):
         ''' Returns the log of the tensor '''
 
-        data = np.log(self.data)
+        data = np.log(self.data).clip(min=-100)
+        
         requires_grad = self.requires_grad
         grad_fn = None
 

@@ -144,7 +144,7 @@ class Adam(Optimizer):
     def __init__(
         self, 
         params: list[Tensor], 
-        lr: float = 1e-2, 
+        lr: float = 1e-3, 
         betas: tuple[float, float] = (0.9, 0.999), 
         eps: float = 1e-8
     ):
