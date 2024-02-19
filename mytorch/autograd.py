@@ -2,6 +2,14 @@ from typing import Union, Optional, Callable, SupportsIndex
 from numpy._typing import _ShapeLike, ArrayLike, DTypeLike
 
 import numpy as np
+np.seterr(all='ignore')
+
+Tensorable = Union['Tensor', ArrayLike]
+
+def ensure_tensor(tensor: Tensorable) -> 'Tensor':
+    ''' Ensures the input is a tensor '''
+    
+    return tensor if isinstance(tensor, Tensor) else Tensor(tensor)
 
 class Tensor:
     def __init__(
@@ -33,7 +41,7 @@ class Tensor:
         self.grad = np.zeros(self.data.shape, dtype=self.dtype)
 
     def pos(self):
-        ''' Gets called when using +t '''
+        ''' Gets the positive value of the tensor '''
 
         data = self.data
         requires_grad = self.requires_grad
@@ -51,7 +59,7 @@ class Tensor:
         return self.pos()
 
     def neg(self):
-        ''' Gets called when using -t '''
+        ''' Gets the negative value of the tensor '''
 
         data = -self.data
         requires_grad = self.requires_grad
@@ -68,217 +76,218 @@ class Tensor:
 
         return self.neg()
 
-    def add(self, other: Union['Tensor', ArrayLike]):
-        ''' Gets called when using t + other '''
+    def add(self, other: Tensorable):
+        ''' Gets the sum of the tensor and another tensor '''
 
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        other = ensure_tensor(other)
 
-        data = self.data + tensor.data
-        requires_grad = self.requires_grad or tensor.requires_grad
+        data = self.data + other.data
+        requires_grad = self.requires_grad or other.requires_grad
         grad_fn = None
 
         if requires_grad:
             def grad_fn(grad: np.ndarray):
+                assert isinstance(other, Tensor) # prevent mypy error
+                
                 if self.requires_grad:
                     self.backward(grad)
                 
-                if tensor.requires_grad:
-                    tensor.backward(grad)
+                if other.requires_grad:
+                    other.backward(grad)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __add__(self, other: Union['Tensor', ArrayLike]):
+    def __add__(self, other: Tensorable):
         ''' Gets called when using t + other '''
 
         return self.add(other)
 
-    def __radd__(self, other: Union['Tensor', ArrayLike]):
+    def __radd__(self, other: Tensorable):
         ''' Gets called when using other + t '''
 
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        return ensure_tensor(other).add(self)
 
-        return tensor.add(self)
+    def sub(self, other: Tensorable):
+        ''' Gets the difference of the tensor and another tensor '''
 
-    def sub(self, other: Union['Tensor', ArrayLike]):
-        ''' Gets called when using t - other '''
+        other = ensure_tensor(other)
 
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
-
-        data = self.data - tensor.data
-        requires_grad = self.requires_grad or tensor.requires_grad
+        data = self.data - other.data
+        requires_grad = self.requires_grad or other.requires_grad
         grad_fn = None
 
         if requires_grad:
             def grad_fn(grad: np.ndarray):
+                assert isinstance(other, Tensor) # prevent mypy error
+                
                 if self.requires_grad:
                     self.backward(grad)
                 
-                if tensor.requires_grad:
-                    tensor.backward(-grad)
+                if other.requires_grad:
+                    other.backward(-grad)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __sub__(self, other: Union['Tensor', ArrayLike]):
+    def __sub__(self, other: Tensorable):
         ''' Gets called when using t - other '''
 
         return self.sub(other)
 
-    def __rsub__(self, other: Union['Tensor', ArrayLike]):
+    def __rsub__(self, other: Tensorable):
         ''' Gets called when using other - t '''
 
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        return ensure_tensor(other).sub(self)
 
-        return tensor.sub(self)
+    def mul(self, other: Tensorable):
+        ''' Gets the product of the tensor and another tensor '''
 
-    def mul(self, other: Union['Tensor', ArrayLike]):
-        ''' Gets called when using t * other '''
+        other = ensure_tensor(other)
 
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
-
-        data = self.data * tensor.data
-        requires_grad = self.requires_grad or tensor.requires_grad
+        data = self.data * other.data
+        requires_grad = self.requires_grad or other.requires_grad
         grad_fn = None
 
         if requires_grad:
             def grad_fn(grad: np.ndarray):
+                assert isinstance(other, Tensor) # prevent mypy error
+                
                 if self.requires_grad:
-                    self.backward(grad * tensor.data)
+                    self.backward(grad * other.data)
                     
-                if tensor.requires_grad:
-                    tensor.backward(grad * self.data)
+                if other.requires_grad:
+                    other.backward(grad * self.data)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __mul__(self, other: Union['Tensor', ArrayLike]):
+    def __mul__(self, other: Tensorable):
         ''' Gets called when using t * other '''
 
         return self.mul(other)
 
-    def __rmul__(self, other: Union['Tensor', ArrayLike]):
+    def __rmul__(self, other: Tensorable):
         ''' Gets called when using other * t '''
 
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        return ensure_tensor(other).mul(self)
 
-        return tensor.mul(self)
+    def div(self, other: Tensorable):
+        ''' Gets the division of the tensor and another tensor '''
 
-    def div(self, other: Union['Tensor', ArrayLike]):
-        ''' Gets called when using t / other '''
+        other = ensure_tensor(other)
 
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
-
-        data = self.data / tensor.data
-        requires_grad = self.requires_grad or tensor.requires_grad
+        data = self.data / other.data
+        requires_grad = self.requires_grad or other.requires_grad
         grad_fn = None
 
         if requires_grad:
             def grad_fn(grad: np.ndarray):
+                assert isinstance(other, Tensor) # prevent mypy error
+                
                 if self.requires_grad:
-                    self.backward(grad / tensor.data)
+                    self.backward(grad / other.data)
                     
-                if tensor.requires_grad:
-                    tensor.backward(-grad * self.data / tensor.data ** 2)
+                if other.requires_grad:
+                    other.backward(-grad * self.data / other.data ** 2)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __truediv__(self, other: Union['Tensor', ArrayLike]):
+    def __truediv__(self, other: Tensorable):
         ''' Gets called when using t / other '''
 
         return self.div(other)
 
-    def __rtruediv__(self, other: Union['Tensor', ArrayLike]):
+    def __rtruediv__(self, other: Tensorable):
         ''' Gets called when using other / t '''
     
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        return ensure_tensor(other).div(self)
 
-        return tensor.div(self)
+    def matmul(self, other: Tensorable):
+        ''' Gets the matrix product of the tensor and another tensor '''
 
-    def matmul(self, other: Union['Tensor', ArrayLike]):
-        ''' Gets called when using t @ other '''
-
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        other = ensure_tensor(other)
         
-        data = self.data @ tensor.data
-        requires_grad = self.requires_grad or tensor.requires_grad
+        data = self.data @ other.data
+        requires_grad = self.requires_grad or other.requires_grad
         grad_fn = None
 
         if requires_grad:
             def grad_fn(grad: np.ndarray):
+                assert isinstance(other, Tensor) # prevent mypy error
+                
                 if self.requires_grad:
+                    
                     # Matrix @ Matrix or Vector @ Matrix
                     if (
-                        self.data.ndim > 1 and tensor.data.ndim > 1 or
-                        self.data.ndim == 1 and tensor.data.ndim > 1
+                        self.data.ndim > 1 and other.data.ndim > 1 or
+                        self.data.ndim == 1 and other.data.ndim > 1
                     ):
-                        self.backward(grad @ tensor.data.swapaxes(-1, -2))
+                        self.backward(grad @ other.data.swapaxes(-1, -2))
 
                     # Vector @ Vector
-                    elif self.data.ndim == 1 and tensor.data.ndim == 1:
-                        self.backward(grad * tensor.data)
+                    elif self.data.ndim == 1 and other.data.ndim == 1:
+                        self.backward(grad * other.data)
 
                     # Matrix @ Vector
-                    elif self.data.ndim > 1 and tensor.data.ndim == 1:
-                        self.backward(np.outer(grad, tensor.data))
+                    elif self.data.ndim > 1 and other.data.ndim == 1:
+                        self.backward(np.outer(grad, other.data))
                 
-                if tensor.requires_grad:
+                if other.requires_grad:
                     # Matrix @ Matrix or Matrix @ Vector
                     if (
-                        self.data.ndim > 1 and tensor.data.ndim > 1 or
-                        self.data.ndim > 1 and tensor.data.ndim == 1
+                        self.data.ndim > 1 and other.data.ndim > 1 or
+                        self.data.ndim > 1 and other.data.ndim == 1
                     ):
-                        tensor.backward(self.data.swapaxes(-1, -2) @ grad)
+                        other.backward(self.data.swapaxes(-1, -2) @ grad)
 
                     # Vector @ Vector
-                    elif self.data.ndim == 1 and tensor.data.ndim == 1:
-                        tensor.backward(grad * self.data)
+                    elif self.data.ndim == 1 and other.data.ndim == 1:
+                        other.backward(grad * self.data)
 
                     # Vector @ Matrix
-                    elif self.data.ndim == 1 and tensor.data.ndim > 1:
-                        tensor.backward(np.outer(self.data, grad))
+                    elif self.data.ndim == 1 and other.data.ndim > 1:
+                        other.backward(np.outer(self.data, grad))
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __matmul__(self, other: Union['Tensor', ArrayLike]):
+    def __matmul__(self, other: Tensorable):
         ''' Gets called when using t @ other '''
 
         return self.matmul(other)
 
-    def __rmatmul__(self, other: Union['Tensor', ArrayLike]):
+    def __rmatmul__(self, other: Tensorable):
         ''' Gets called when using other @ t '''
 
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        return ensure_tensor(other).matmul(self)
 
-        return tensor.matmul(self)
+    def power(self, other: Tensorable):
+        ''' Gets the power of the tensor and another tensor '''
 
-    def power(self, other: Union['Tensor', ArrayLike]):
-        ''' Gets called when using t ** other '''
+        other = ensure_tensor(other)
 
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
-
-        data = self.data ** tensor.data
-        requires_grad = self.requires_grad or tensor.requires_grad
+        data = self.data ** other.data
+        requires_grad = self.requires_grad or other.requires_grad
         grad_fn = None
 
         if requires_grad:
             def grad_fn(grad: np.ndarray):
+                assert isinstance(other, Tensor) # prevent mypy error
+                
                 if self.requires_grad:
-                    self.backward(grad * tensor.data * self.data ** (tensor.data - 1))
+                    self.backward(grad * other.data * self.data ** (other.data - 1))
                     
-                if tensor.requires_grad:
-                    tensor.backward(grad * np.log(self.data) * data)
+                if other.requires_grad:
+                    other.backward(grad * np.log(self.data) * data)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __pow__(self, other: Union['Tensor', ArrayLike]):
+    def __pow__(self, other: Tensorable):
         ''' Gets called when using t ** other '''
 
         return self.power(other)
 
-    def __rpow__(self, other: Union['Tensor', ArrayLike]):
+    def __rpow__(self, other: Tensorable):
         ''' Gets called when using other ** t '''
 
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
-
-        return tensor.power(self)
+        return ensure_tensor(other).power(self)
 
     def abs(self):
         ''' Returns the absolute value of the tensor '''
@@ -294,7 +303,7 @@ class Tensor:
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def __abs__(self):
-        ''' Returns the absolute value of the tensor '''
+        ''' Gets called when using abs(t) '''
         
         return self.abs()
 
@@ -314,13 +323,13 @@ class Tensor:
     def log(self):
         ''' Returns the log of the tensor '''
 
-        data = np.log(self.data).clip(min=-100)
+        data = np.log(self.data)
         requires_grad = self.requires_grad
         grad_fn = None
 
         if requires_grad:
             def grad_fn(grad: np.ndarray):
-                self.backward(grad / np.where(self.data != 0, self.data, 1e-12))
+                self.backward(grad / self.data)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
@@ -331,7 +340,7 @@ class Tensor:
         requires_grad = self.requires_grad
         grad_fn = None
 
-        if requires_grad:
+        if requires_grad:            
             def grad_fn(grad: np.ndarray):
                 self.backward(grad * data)
 
@@ -438,10 +447,10 @@ class Tensor:
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def maximum(self, other: Union['Tensor', ArrayLike]):
+    def maximum(self, other: Tensorable):
         ''' Returns the max values of the tensor '''
 
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        tensor = ensure_tensor(other)
 
         data = np.maximum(self.data, tensor.data)
         requires_grad = self.requires_grad or tensor.requires_grad
@@ -450,17 +459,19 @@ class Tensor:
         if requires_grad:
             def grad_fn(grad: np.ndarray):
                 if self.requires_grad:
-                    self.backward(grad * (self.data >= tensor.data))
+                    self.backward(grad * (self.data > tensor.data))
+                    self.backward(grad * 0.5 * (self.data == tensor.data))
                     
                 if tensor.requires_grad:
-                    tensor.backward(grad * (tensor.data >= self.data))
+                    tensor.backward(grad * (tensor.data > self.data))
+                    tensor.backward(grad * 0.5 * (tensor.data == self.data))
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def minimum(self, other: Union['Tensor', ArrayLike]):
+    def minimum(self, other: Tensorable):
         ''' Returns the min values of the tensor '''
 
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
+        tensor = ensure_tensor(other)
 
         data = np.minimum(self.data, tensor.data)
         requires_grad = self.requires_grad or tensor.requires_grad
@@ -469,10 +480,12 @@ class Tensor:
         if requires_grad:
             def grad_fn(grad: np.ndarray):
                 if self.requires_grad:
-                    self.backward(grad * (self.data <= tensor.data))
+                    self.backward(grad * (self.data < tensor.data))
+                    self.backward(grad * 0.5 * (self.data == tensor.data))
                     
                 if tensor.requires_grad:
-                    tensor.backward(grad * (tensor.data <= self.data))
+                    tensor.backward(grad * (tensor.data < self.data))
+                    tensor.backward(grad * 0.5 * (tensor.data == self.data))
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
@@ -510,19 +523,19 @@ class Tensor:
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def concatenate(self, *arrays: Union['Tensor', ArrayLike], axis: SupportsIndex = 0):
+    def concatenate(self, arrays: list[Tensorable], axis: SupportsIndex = 0):
         ''' Concatenates the tensors '''
         
-        tensors = [self] + [t if isinstance(t, Tensor) else Tensor(t) for t in arrays]
+        tensors = [self] + [ensure_tensor(tensor) for tensor in arrays]
 
-        data = np.concatenate([t.data for t in tensors], axis=axis)
-        requires_grad = any(t.requires_grad for t in tensors)
+        data = np.concatenate([tensor.data for tensor in tensors], axis=axis)
+        requires_grad = any(tensor.requires_grad for tensor in tensors)
         grad_fn = None
 
         if requires_grad:
             def grad_fn(grad: np.ndarray):
                 # Get the indices to split the gradient
-                indices = np.cumsum([t.data.shape[axis] for t in tensors[:-1]])
+                indices = np.cumsum([t.shape[axis] for t in tensors[:-1]])
 
                 grads = np.split(grad, indices, axis=axis)
 
@@ -590,22 +603,37 @@ class Tensor:
                 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
     
-    def where(self, x: Union['Tensor', ArrayLike], y: Union['Tensor', ArrayLike]):
-        ''' Returns elements chosen from x or y depending on condition '''
+    def where(self, condition: Tensorable, other: Tensorable):
+        ''' Returns elements chosen from self or other depending on condition '''
         
-        tensor_x = x if isinstance(x, Tensor) else Tensor(x)
-        tensor_y = y if isinstance(y, Tensor) else Tensor(y)
+        condition = ensure_tensor(condition)
+        other = ensure_tensor(other)
         
-        data = np.where(self.data, tensor_x.data, tensor_y.data)
-        requires_grad = tensor_x.requires_grad or tensor_y.requires_grad
+        data = np.where(condition.data, self.data, other.data)
+        requires_grad = self.requires_grad or other.requires_grad
         grad_fn = None
         
         if requires_grad:
             def grad_fn(grad: np.ndarray):
-                tensor_x.backward(grad * self.data)
-                tensor_y.backward(grad * ~self.data)
+                assert isinstance(condition, Tensor) and isinstance(other, Tensor) # prevent mypy error
+                
+                if self.requires_grad:
+                    self.backward(grad * condition.data)
+                    
+                if other.requires_grad:
+                    other.backward(grad * ~condition.data)
         
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+      
+    def argmax(self, axis: Optional[SupportsIndex] = None, keepdims: bool = False):
+        ''' Returns the indices of the maximum values along an axis '''
+    
+        return Tensor(self.data.argmax(axis=axis, keepdims=keepdims))
+      
+    def argmin(self, axis: Optional[SupportsIndex] = None, keepdims: bool = False):
+        ''' Returns the indices of the minimum values along an axis '''
+      
+        return Tensor(self.data.argmin(axis=axis, keepdims=keepdims))
       
     def getitem(self, key):
         ''' Gets called when using t[key] '''
@@ -613,19 +641,16 @@ class Tensor:
         if isinstance(key, Tensor):
             key = key.data
         
-        if isinstance(key, (list, tuple)):
-            new_key = []
+        elif isinstance(key, (list, tuple)):
+            key_ = []
             
             for item in key:
                 if isinstance(item, Tensor):
-                    new_key.append(item.data)
+                    key_.append(item.data)
                 else:
-                    new_key.append(item)
-                    
-            if isinstance(key, tuple):
-                key = tuple(new_key)
-            else:
-                key = new_key
+                    key_.append(item)
+                   
+            key = tuple(key_) if isinstance(key, tuple) else key_
             
         data = self.data[key]
         requires_grad = self.requires_grad
@@ -644,23 +669,7 @@ class Tensor:
         ''' Gets called when using t[key] '''
         
         return self.getitem(key)  
-      
-    def setitem(self, key, value):
-        ''' Gets called when using t[key] = value '''
-        
-        if isinstance(key, Tensor):
-            key = key.data
-        
-        if isinstance(value, Tensor):
-            value = value.data
-        
-        self.data[key] = value
-        
-    def __setitem__(self, key, value):
-        ''' Gets called when using t[key] = value '''
-        
-        self.setitem(key, value)
-      
+         
     def iter(self):
         ''' Returns an iterator over the tensor '''
         
@@ -668,83 +677,69 @@ class Tensor:
             yield self.getitem(i)
         
     def __iter__(self):
-        ''' Returns an iterator over the tensor '''
+        ''' Gets called when using iter(t) '''
         
         return self.iter()
     
-    def gt(self, other: Union['Tensor', ArrayLike]):
-        ''' Returns the truth value of self > other '''
+    def gt(self, other: Tensorable):
+        ''' Gets the truth value of self > other '''
         
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
-        
-        return Tensor(self.data > tensor.data)
+        return Tensor(self.data > ensure_tensor(other).data)
     
-    def __gt__(self, other: Union['Tensor', ArrayLike]):
-        ''' Returns the truth value of self > other '''
+    def __gt__(self, other: Tensorable):
+        ''' Gets called when using t > other '''
         
         return self.gt(other)
     
-    def ge(self, other: Union['Tensor', ArrayLike]):
-        ''' Returns the truth value of self >= other '''
+    def ge(self, other: Tensorable):
+        ''' Gets the truth value of self >= other '''
         
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
-        
-        return Tensor(self.data >= tensor.data)
+        return Tensor(self.data >= ensure_tensor(other).data)
     
-    def __ge__(self, other: Union['Tensor', ArrayLike]):
-        ''' Returns the truth value of self >= other '''
+    def __ge__(self, other: Tensorable):
+        ''' Gets called when using t >= other '''
         
         return self.ge(other)
     
-    def lt(self, other: Union['Tensor', ArrayLike]):
-        ''' Returns the truth value of self < other '''
+    def lt(self, other: Tensorable):
+        ''' Gets the truth value of self < other '''
         
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
-        
-        return Tensor(self.data < tensor.data)
+        return Tensor(self.data < ensure_tensor(other).data)
     
-    def __lt__(self, other: Union['Tensor', ArrayLike]):
-        ''' Returns the truth value of self < other '''
+    def __lt__(self, other: Tensorable):
+        ''' Gets called when using t < other '''
         
         return self.lt(other)
     
-    def le(self, other: Union['Tensor', ArrayLike]):
-        ''' Returns the truth value of self <= other '''
+    def le(self, other: Tensorable):
+        ''' Gets the truth value of self <= other '''
         
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
-        
-        return Tensor(self.data <= tensor.data)
+        return Tensor(self.data <= ensure_tensor(other).data)
     
-    def __le__(self, other: Union['Tensor', ArrayLike]):
-        ''' Returns the truth value of self <= other '''
+    def __le__(self, other: Tensorable):
+        ''' Gets called when using t <= other '''
         
         return self.le(other)
     
-    def eq(self, other: Union['Tensor', ArrayLike]):
+    def eq(self, other: Tensorable):
         ''' Returns the truth value of self == other '''
         
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
-                
-        return Tensor(self.data == tensor.data)
+        return Tensor(self.data == ensure_tensor(other).data)
     
     def __eq__(self, other):
-        ''' Returns the truth value of self == other '''
+        ''' Gets called when using t == other '''
         
         return self.eq(other)
     
-    def ne(self, other: Union['Tensor', ArrayLike]):
-        ''' Returns the truth value of self != other '''
+    def ne(self, other: Tensorable):
+        ''' Gets the truth value of self != other '''
         
-        tensor = other if isinstance(other, Tensor) else Tensor(other)
-        
-        return Tensor(self.data != tensor.data)
+        return Tensor(self.data != ensure_tensor(other).data)
     
     def __ne__(self, other):
-        ''' Returns the truth value of self != other '''
+        ''' Gets called when using t != other '''
         
         return self.ne(other)
-
-    # Properties
 
     @property
     def shape(self):
@@ -776,11 +771,11 @@ class Tensor:
         
         return self.transpose()
 
-    # End properties
-
     def backward(self, grad: Optional[ArrayLike] = None):
+        ''' Backpropagates the gradient through the computation graph '''
+        
         if not self.requires_grad:
-            return
+            raise RuntimeError('Cannot compute gradient on tensor that does not require grad')
 
         # Initialize gradient if not provided
         if grad is None:
