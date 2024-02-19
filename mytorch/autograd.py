@@ -315,13 +315,12 @@ class Tensor:
         ''' Returns the log of the tensor '''
 
         data = np.log(self.data).clip(min=-100)
-        
         requires_grad = self.requires_grad
         grad_fn = None
 
         if requires_grad:
             def grad_fn(grad: np.ndarray):
-                self.backward(grad / self.data)
+                self.backward(grad / np.where(self.data != 0, self.data, 1e-12))
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 

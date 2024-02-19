@@ -45,3 +45,4 @@ class Linear(Layer):
             y += self.bias
             
         return y
+    

@@ -1,4 +1,4 @@
-from torch.nn import Sequential, Linear, Sigmoid, BCELoss
+from torch.nn import Sequential, Linear, Sigmoid, BCELoss, CrossEntropyLoss
 from torch.optim import Adam
 
 import torch
