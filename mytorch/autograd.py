@@ -17,28 +17,23 @@ class Tensor:
         data: ArrayLike,
         dtype: DTypeLike = None,
         requires_grad = False,
-        grad_fn: Optional[Callable[[np.ndarray], None]] = None
+        grad_fn: Optional[Callable[['Tensor'], None]] = None
     ):
         self.data = np.array(data, dtype=dtype)
         self.requires_grad = requires_grad
         self.grad_fn = grad_fn
 
-        self.grad: Optional[np.ndarray] = None
+        self.grad: Optional[Tensor] = None
 
     def __repr__(self):
         ''' Returns a string representation of the tensor '''
 
-        return f'Tensor({self.data}, dtype={self.dtype}, requires_grad={self.requires_grad})'
+        return f'tensor({self.data}, dtype={self.dtype}, requires_grad={self.requires_grad})'
 
     def detach(self):
         ''' Detaches the tensor from the computation graph '''
         
         return Tensor(self.data, self.dtype, requires_grad=False)
-
-    def zero_grad(self):
-        ''' Zeros the gradient of the tensor '''
-
-        self.grad = np.zeros(self.data.shape, dtype=self.dtype)
 
     def pos(self):
         ''' Gets the positive value of the tensor '''
@@ -48,10 +43,20 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 self.backward(grad)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+
+    def invert(self):
+        ''' Gets the inverse value of the tensor '''
+
+        return Tensor(~self.data)
+
+    def __invert__(self):
+        ''' Gets called when using ~t '''
+
+        return self.invert()
 
     def __pos__(self):
         ''' Gets called when using +t '''
@@ -66,7 +71,7 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 self.backward(-grad)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
@@ -76,7 +81,7 @@ class Tensor:
 
         return self.neg()
 
-    def add(self, other: Tensorable):
+    def add(self, other):
         ''' Gets the sum of the tensor and another tensor '''
 
         other = ensure_tensor(other)
@@ -86,9 +91,7 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                assert isinstance(other, Tensor) # prevent mypy error
-                
+            def grad_fn(grad: Tensor):
                 if self.requires_grad:
                     self.backward(grad)
                 
@@ -97,17 +100,17 @@ class Tensor:
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __add__(self, other: Tensorable):
+    def __add__(self, other):
         ''' Gets called when using t + other '''
 
         return self.add(other)
 
-    def __radd__(self, other: Tensorable):
+    def __radd__(self, other):
         ''' Gets called when using other + t '''
 
         return ensure_tensor(other).add(self)
 
-    def sub(self, other: Tensorable):
+    def sub(self, other):
         ''' Gets the difference of the tensor and another tensor '''
 
         other = ensure_tensor(other)
@@ -117,9 +120,7 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                assert isinstance(other, Tensor) # prevent mypy error
-                
+            def grad_fn(grad: Tensor):
                 if self.requires_grad:
                     self.backward(grad)
                 
@@ -128,17 +129,17 @@ class Tensor:
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __sub__(self, other: Tensorable):
+    def __sub__(self, other):
         ''' Gets called when using t - other '''
 
         return self.sub(other)
 
-    def __rsub__(self, other: Tensorable):
+    def __rsub__(self, other):
         ''' Gets called when using other - t '''
 
         return ensure_tensor(other).sub(self)
 
-    def mul(self, other: Tensorable):
+    def mul(self, other):
         ''' Gets the product of the tensor and another tensor '''
 
         other = ensure_tensor(other)
@@ -148,28 +149,26 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                assert isinstance(other, Tensor) # prevent mypy error
-                
+            def grad_fn(grad: Tensor):
                 if self.requires_grad:
-                    self.backward(grad * other.data)
+                    self.backward(grad * other)
                     
                 if other.requires_grad:
-                    other.backward(grad * self.data)
+                    other.backward(grad * self)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __mul__(self, other: Tensorable):
+    def __mul__(self, other):
         ''' Gets called when using t * other '''
 
         return self.mul(other)
 
-    def __rmul__(self, other: Tensorable):
+    def __rmul__(self, other):
         ''' Gets called when using other * t '''
 
         return ensure_tensor(other).mul(self)
 
-    def div(self, other: Tensorable):
+    def div(self, other):
         ''' Gets the division of the tensor and another tensor '''
 
         other = ensure_tensor(other)
@@ -179,28 +178,26 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                assert isinstance(other, Tensor) # prevent mypy error
-                
+            def grad_fn(grad: Tensor):
                 if self.requires_grad:
-                    self.backward(grad / other.data)
+                    self.backward(grad / other)
                     
                 if other.requires_grad:
-                    other.backward(-grad * self.data / other.data ** 2)
+                    other.backward(-grad * self / other ** 2)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __truediv__(self, other: Tensorable):
+    def __truediv__(self, other):
         ''' Gets called when using t / other '''
 
         return self.div(other)
 
-    def __rtruediv__(self, other: Tensorable):
+    def __rtruediv__(self, other):
         ''' Gets called when using other / t '''
     
         return ensure_tensor(other).div(self)
 
-    def matmul(self, other: Tensorable):
+    def matmul(self, other):
         ''' Gets the matrix product of the tensor and another tensor '''
 
         other = ensure_tensor(other)
@@ -210,55 +207,46 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                assert isinstance(other, Tensor) # prevent mypy error
-                
+            def grad_fn(grad: Tensor):
                 if self.requires_grad:
-                    
                     # Matrix @ Matrix or Vector @ Matrix
-                    if (
-                        self.data.ndim > 1 and other.data.ndim > 1 or
-                        self.data.ndim == 1 and other.data.ndim > 1
-                    ):
-                        self.backward(grad @ other.data.swapaxes(-1, -2))
+                    if (self.ndim > 1 and other.ndim > 1 or self.ndim == 1 and other.ndim > 1):
+                        self.backward(grad @ other.swapaxes(-1, -2))
 
                     # Vector @ Vector
-                    elif self.data.ndim == 1 and other.data.ndim == 1:
-                        self.backward(grad * other.data)
+                    elif self.ndim == 1 and other.ndim == 1:
+                        self.backward(grad * other)
 
                     # Matrix @ Vector
-                    elif self.data.ndim > 1 and other.data.ndim == 1:
-                        self.backward(np.outer(grad, other.data))
+                    elif self.ndim > 1 and other.ndim == 1:
+                        self.backward(grad.outer(other))
                 
                 if other.requires_grad:
                     # Matrix @ Matrix or Matrix @ Vector
-                    if (
-                        self.data.ndim > 1 and other.data.ndim > 1 or
-                        self.data.ndim > 1 and other.data.ndim == 1
-                    ):
-                        other.backward(self.data.swapaxes(-1, -2) @ grad)
+                    if (self.ndim > 1 and other.ndim > 1 or self.ndim > 1 and other.ndim == 1):
+                        other.backward(self.swapaxes(-1, -2) @ grad)
 
                     # Vector @ Vector
-                    elif self.data.ndim == 1 and other.data.ndim == 1:
-                        other.backward(grad * self.data)
+                    elif self.ndim == 1 and other.ndim == 1:
+                        other.backward(grad * self)
 
                     # Vector @ Matrix
-                    elif self.data.ndim == 1 and other.data.ndim > 1:
-                        other.backward(np.outer(self.data, grad))
+                    elif self.ndim == 1 and other.ndim > 1:
+                        other.backward(self.outer(grad))
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __matmul__(self, other: Tensorable):
+    def __matmul__(self, other):
         ''' Gets called when using t @ other '''
 
         return self.matmul(other)
 
-    def __rmatmul__(self, other: Tensorable):
+    def __rmatmul__(self, other):
         ''' Gets called when using other @ t '''
 
         return ensure_tensor(other).matmul(self)
 
-    def power(self, other: Tensorable):
+    def power(self, other):
         ''' Gets the power of the tensor and another tensor '''
 
         other = ensure_tensor(other)
@@ -268,23 +256,21 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                assert isinstance(other, Tensor) # prevent mypy error
-                
+            def grad_fn(grad: Tensor):
                 if self.requires_grad:
-                    self.backward(grad * other.data * self.data ** (other.data - 1))
+                    self.backward(grad * other * self ** (other - 1))
                     
                 if other.requires_grad:
-                    other.backward(grad * np.log(self.data) * data)
+                    other.backward(grad * self.log() * data)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __pow__(self, other: Tensorable):
+    def __pow__(self, other):
         ''' Gets called when using t ** other '''
 
         return self.power(other)
 
-    def __rpow__(self, other: Tensorable):
+    def __rpow__(self, other):
         ''' Gets called when using other ** t '''
 
         return ensure_tensor(other).power(self)
@@ -298,7 +284,7 @@ class Tensor:
 
         if requires_grad:
             def grad_fn(grad: np.ndarray):
-                self.backward(grad * np.sign(self.data))
+                self.backward(grad * self.sign())
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
@@ -306,6 +292,25 @@ class Tensor:
         ''' Gets called when using abs(t) '''
         
         return self.abs()
+
+    def outer(self, other):
+        ''' Returns the outer product of the tensor and another tensor '''
+
+        other = ensure_tensor(other)
+
+        data = np.outer(self.data, other.data)
+        requires_grad = self.requires_grad or other.requires_grad
+        grad_fn = None
+
+        if requires_grad:
+            def grad_fn(grad: Tensor):
+                if self.requires_grad:
+                    self.backward((grad @ other).reshape(self.shape))
+                    
+                if other.requires_grad:
+                    other.backward((self @ grad).reshape(other.shape))
+                
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def sqrt(self):
         ''' Returns the square root of the tensor '''
@@ -315,7 +320,7 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 self.backward(grad / (2 * data))
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
@@ -328,8 +333,8 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                self.backward(grad / self.data)
+            def grad_fn(grad: Tensor):
+                self.backward(grad / self)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
@@ -341,7 +346,7 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:            
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 self.backward(grad * data)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
@@ -354,7 +359,7 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 self.backward(grad * (1 - data ** 2))
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
@@ -367,8 +372,8 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                self.backward(grad * np.cos(self.data))
+            def grad_fn(grad: Tensor):
+                self.backward(grad * self.cos())
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
@@ -380,9 +385,38 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                self.backward(grad * -np.sin(self.data))
+            def grad_fn(grad: Tensor):
+                self.backward(grad * -self.sin())
 
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+
+    def expand_dims(self, axis: _ShapeLike):
+        ''' Expands the dimensions of the tensor '''
+        
+        data = np.expand_dims(self.data, axis)
+        requires_grad = self.requires_grad
+        grad_fn = None
+        
+        if requires_grad:
+            def grad_fn(grad: Tensor):
+                self.backward(grad.squeeze(axis))
+                
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+
+    def squeeze(self, axis: Optional[_ShapeLike] = None):
+        ''' Squeezes the tensor '''
+        
+        data = np.squeeze(self.data, axis)
+        requires_grad = self.requires_grad
+        grad_fn = None
+        
+        if requires_grad:
+            def grad_fn(grad: Tensor):
+                if axis is None:
+                    self.backward(grad.reshape(self.shape))
+                else:
+                    self.backward(grad.expand_dims(axis))
+                
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def sum(self, axis: Optional[_ShapeLike] = None, keepdims: bool = False):
@@ -393,12 +427,12 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 # Expand gradient to match data shape
-                if self.data.ndim != grad.ndim and axis is not None:
-                    grad = np.expand_dims(grad, axis)
+                if self.ndim != grad.ndim and axis is not None:
+                    grad = grad.expand_dims(axis)
 
-                self.backward(grad * np.ones(self.data.shape))
+                self.backward(grad * np.ones(self.shape))
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
@@ -410,15 +444,15 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 # Expand gradient to match data shape
-                if self.data.ndim != grad.ndim and axis is not None:
-                    grad = np.expand_dims(grad, axis)
+                if self.ndim != grad.ndim and axis is not None:
+                    grad = grad.expand_dims(axis)
 
                 # Compute size of the mean
                 axis_ = list(axis) if isinstance(axis, tuple) else axis
-                size = np.prod(np.array(self.data.shape)[axis_]) # type: ignore
-
+                size = np.array(self.shape)[axis_].prod() # type: ignore
+                
                 self.backward(grad * np.ones(self.data.shape) / size)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
@@ -431,20 +465,20 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 # Expand gradient to match data shape
-                if self.data.ndim != grad.ndim and axis is not None:
-                    grad = np.expand_dims(grad, axis)
+                if self.ndim != grad.ndim and axis is not None:
+                    grad = grad.expand_dims(axis)
 
                 # Compute size of the variance
                 axis_ = list(axis) if isinstance(axis, tuple) else axis
-                size = np.prod(np.array(self.data.shape)[axis_]) # type: ignore
+                size = np.array(self.shape)[axis_].prod() # type: ignore
 
                 # Compute mean
-                mean = self.data.mean(axis=axis, keepdims=True)
+                mean = self.mean(axis=axis, keepdims=True)
 
-                self.backward(grad * np.ones(self.data.shape) * 2 * (self.data - mean) / size)
-
+                self.backward(grad * np.ones(self.data.shape) * 2 * (self - mean) / size)
+                
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
     def maximum(self, other: Tensorable):
@@ -457,14 +491,14 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 if self.requires_grad:
-                    self.backward(grad * (self.data > tensor.data))
-                    self.backward(grad * 0.5 * (self.data == tensor.data))
+                    self.backward(grad * (self > tensor))
+                    self.backward(grad * 0.5 * (self == tensor))
                     
                 if tensor.requires_grad:
-                    tensor.backward(grad * (tensor.data > self.data))
-                    tensor.backward(grad * 0.5 * (tensor.data == self.data))
+                    tensor.backward(grad * (tensor > self))
+                    tensor.backward(grad * 0.5 * (tensor == self))
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
@@ -478,14 +512,14 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 if self.requires_grad:
-                    self.backward(grad * (self.data < tensor.data))
-                    self.backward(grad * 0.5 * (self.data == tensor.data))
+                    self.backward(grad * (self < tensor))
+                    self.backward(grad * 0.5 * (self == tensor))
                     
                 if tensor.requires_grad:
-                    tensor.backward(grad * (tensor.data < self.data))
-                    tensor.backward(grad * 0.5 * (tensor.data == self.data))
+                    tensor.backward(grad * (tensor < self))
+                    tensor.backward(grad * 0.5 * (tensor == self))
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
@@ -497,12 +531,12 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 # Expand gradient to match data shape
-                if self.data.ndim != grad.ndim and axis is not None:
-                    grad = np.expand_dims(grad, axis)
+                if self.ndim != grad.ndim and axis is not None:
+                    grad = grad.expand_dims(axis)
 
-                self.backward(grad * (self.data == self.data.max(axis=axis, keepdims=True)))
+                self.backward(grad * (self == self.max(axis=axis, keepdims=True)))
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
@@ -514,14 +548,45 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 # Expand gradient to match data shape
-                if self.data.ndim != grad.ndim and axis is not None:
-                    grad = np.expand_dims(grad, axis)
+                if self.ndim != grad.ndim and axis is not None:
+                    grad = grad.expand_dims(axis)
 
-                self.backward(grad * (self.data == self.data.min(axis=axis, keepdims=True)))
+                self.backward(grad * (self == self.min(axis=axis, keepdims=True)))
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+
+    def split(self, indices_or_sections: _ShapeLike, axis: SupportsIndex = 0):
+        ''' Splits the tensor '''
+        
+        data = np.split(self.data, indices_or_sections, axis=axis)
+        requires_grad = self.requires_grad
+        
+        tensors: list[Tensor] = []
+        
+        for i, item in enumerate(data):
+            grad_fn = None
+            
+            if requires_grad:
+                def grad_fn(grad: Tensor, i=i):
+                    previous_ = data[:i]
+                    next_ = data[i+1:]
+                    
+                    if len(previous_) != 0:
+                        previous_ = np.zeros_like(np.concatenate(previous_, axis=axis))
+                        
+                    if len(next_) != 0:
+                        next_ = np.zeros_like(np.concatenate(next_, axis=axis))
+                    
+                    previous_ = ensure_tensor(previous_) # type: ignore
+                    next_ = ensure_tensor(next_) # type: ignore
+                    
+                    self.backward(previous_.concatenate([grad, next_], axis=axis)) # type: ignore
+            
+            tensors.append(Tensor(item, requires_grad=requires_grad, grad_fn=grad_fn))
+
+        return tensors
 
     def concatenate(self, arrays: list[Tensorable], axis: SupportsIndex = 0):
         ''' Concatenates the tensors '''
@@ -533,11 +598,11 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 # Get the indices to split the gradient
                 indices = np.cumsum([t.shape[axis] for t in tensors[:-1]])
 
-                grads = np.split(grad, indices, axis=axis)
+                grads = grad.split(indices, axis=axis)
 
                 for tensor, grad in zip(tensors, grads):
                     if tensor.requires_grad:
@@ -553,8 +618,8 @@ class Tensor:
         grad_fn = None
 
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                self.backward(grad.reshape(self.data.shape))
+            def grad_fn(grad: Tensor):
+                self.backward(grad.reshape(self.shape))
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
@@ -569,7 +634,7 @@ class Tensor:
         grad_fn = None
         
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 self.backward(grad.transpose(axes))
                 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
@@ -582,7 +647,7 @@ class Tensor:
         grad_fn = None
         
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def grad_fn(grad: Tensor):
                 self.backward(grad.swapaxes(axis1, axis2))
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
@@ -598,12 +663,12 @@ class Tensor:
         grad_fn = None
         
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                self.backward(np.flip(grad, axis=axis))
+            def grad_fn(grad: Tensor):
+                self.backward(grad.flip(axis=axis))
                 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
     
-    def where(self, condition: Tensorable, other: Tensorable):
+    def where(self, condition, other):
         ''' Returns elements chosen from self or other depending on condition '''
         
         condition = ensure_tensor(condition)
@@ -614,14 +679,12 @@ class Tensor:
         grad_fn = None
         
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                assert isinstance(condition, Tensor) and isinstance(other, Tensor) # prevent mypy error
-                
+            def grad_fn(grad: Tensor):
                 if self.requires_grad:
-                    self.backward(grad * condition.data)
+                    self.backward(grad * condition)
                     
                 if other.requires_grad:
-                    other.backward(grad * ~condition.data)
+                    other.backward(grad * ~condition)
         
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
       
@@ -657,11 +720,11 @@ class Tensor:
         grad_fn = None
         
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
-                grad_ = np.zeros(self.data.shape)
+            def grad_fn(grad: Tensor):
+                grad_ = np.zeros(self.shape)
                 grad_[key] = grad
                 
-                self.backward(grad_)
+                self.backward(ensure_tensor(grad_))
         
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
@@ -680,6 +743,19 @@ class Tensor:
         ''' Gets called when using iter(t) '''
         
         return self.iter()
+    
+    def sign(self):
+        ''' Returns the sign of the tensor '''
+        
+        data = np.sign(self.data)
+        requires_grad = self.requires_grad
+        grad_fn = None
+        
+        if requires_grad:
+            def grad_fn(grad: Tensor):
+                self.backward(grad * np.zeros(self.shape))
+        
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
     
     def gt(self, other: Tensorable):
         ''' Gets the truth value of self > other '''
@@ -771,7 +847,7 @@ class Tensor:
         
         return self.transpose()
 
-    def backward(self, grad: Optional[ArrayLike] = None):
+    def backward(self, grad: Optional['Tensor'] = None):
         ''' Backpropagates the gradient through the computation graph '''
         
         if not self.requires_grad:
@@ -779,22 +855,25 @@ class Tensor:
 
         # Initialize gradient if not provided
         if grad is None:
-            grad = np.ones(self.data.shape, dtype=self.dtype)
-        else:
-            grad = np.array(grad, dtype=self.dtype)
+            if self.shape == ():
+                grad = Tensor(1.0, dtype=self.dtype)
+            else:
+                raise RuntimeError('Gradient must be provided for non-scalar tensor')
 
         # Sum gradient to match data shape
-        if self.data.shape != grad.shape:
-            keepdims = self.data.ndim == grad.ndim
+        if self.shape != grad.shape:
+            keepdims = self.ndim == grad.ndim
 
             if keepdims:
-                self_shape = np.array(self.data.shape)
+                self_shape = np.array(self.shape)
             else:
-                self_shape = np.array((1,) * (grad.ndim - self.data.ndim) + self.data.shape)
+                self_shape = np.array((1,) * (grad.ndim - self.ndim) + self.shape)
 
-            axis = tuple(np.where(self_shape != np.array(grad.shape))[0])
+            grad_shape = np.array(grad.shape)
 
-            grad = grad.sum(axis=axis, keepdims=keepdims).reshape(self.data.shape)
+            axis = tuple(np.where(self_shape != grad_shape)[0])
+
+            grad = grad.sum(axis=axis, keepdims=keepdims).reshape(self.shape)
 
         if self.grad is None:
             self.grad = grad # type: ignore
