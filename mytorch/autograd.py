@@ -27,13 +27,28 @@ class Tensor:
 
     def __repr__(self):
         ''' Returns a string representation of the tensor '''
-
-        return f'tensor({self.data}, dtype={self.dtype}, requires_grad={self.requires_grad})'
-
+        
+        if self.grad_fn:
+            return f'tensor({self.data}, grad_fn=<{self.grad_fn.__name__}>)'
+        elif self.requires_grad:
+            return f'tensor({self.data}, requires_grad=True)'
+        else:
+            return f'tensor({self.data})'
+    
     def detach(self):
         ''' Detaches the tensor from the computation graph '''
         
         return Tensor(self.data, self.dtype, requires_grad=False)
+
+    def invert(self):
+        ''' Gets the inverse value of the tensor '''
+
+        return Tensor(~self.data)
+
+    def __invert__(self):
+        ''' Gets called when using ~t '''
+
+        return self.invert()
 
     def pos(self):
         ''' Gets the positive value of the tensor '''
@@ -48,16 +63,6 @@ class Tensor:
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def invert(self):
-        ''' Gets the inverse value of the tensor '''
-
-        return Tensor(~self.data)
-
-    def __invert__(self):
-        ''' Gets called when using ~t '''
-
-        return self.invert()
-
     def __pos__(self):
         ''' Gets called when using +t '''
 
@@ -68,7 +73,7 @@ class Tensor:
 
         data = -self.data
         requires_grad = self.requires_grad
-        grad_fn = None
+        grad_fn = None  
 
         if requires_grad:
             def grad_fn(grad: Tensor):
@@ -876,6 +881,7 @@ class Tensor:
             grad = grad.sum(axis=axis, keepdims=keepdims).reshape(self.shape)
 
         if self.grad is None:
+            # Initialize gradient
             self.grad = grad # type: ignore
         else:
             # Accumulate gradient
