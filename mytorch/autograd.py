@@ -45,11 +45,6 @@ class Tensor:
 
         return Tensor(~self.data)
 
-    def __invert__(self):
-        ''' Gets called when using ~t '''
-
-        return self.invert()
-
     def pos(self):
         ''' Gets the positive value of the tensor '''
 
@@ -59,14 +54,9 @@ class Tensor:
 
         if requires_grad:
             def grad_fn(grad: Tensor):
-                self.backward(grad)
+                return grad
 
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
-
-    def __pos__(self):
-        ''' Gets called when using +t '''
-
-        return self.pos()
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn, args=args)
 
     def neg(self):
         ''' Gets the negative value of the tensor '''
@@ -80,11 +70,6 @@ class Tensor:
                 self.backward(-grad)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
-
-    def __neg__(self):
-        ''' Gets called when using -t '''
-
-        return self.neg()
 
     def add(self, other):
         ''' Gets the sum of the tensor and another tensor '''
@@ -105,16 +90,6 @@ class Tensor:
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __add__(self, other):
-        ''' Gets called when using t + other '''
-
-        return self.add(other)
-
-    def __radd__(self, other):
-        ''' Gets called when using other + t '''
-
-        return ensure_tensor(other).add(self)
-
     def sub(self, other):
         ''' Gets the difference of the tensor and another tensor '''
 
@@ -133,16 +108,6 @@ class Tensor:
                     other.backward(-grad)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
-
-    def __sub__(self, other):
-        ''' Gets called when using t - other '''
-
-        return self.sub(other)
-
-    def __rsub__(self, other):
-        ''' Gets called when using other - t '''
-
-        return ensure_tensor(other).sub(self)
 
     def mul(self, other):
         ''' Gets the product of the tensor and another tensor '''
@@ -163,16 +128,6 @@ class Tensor:
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __mul__(self, other):
-        ''' Gets called when using t * other '''
-
-        return self.mul(other)
-
-    def __rmul__(self, other):
-        ''' Gets called when using other * t '''
-
-        return ensure_tensor(other).mul(self)
-
     def div(self, other):
         ''' Gets the division of the tensor and another tensor '''
 
@@ -191,16 +146,6 @@ class Tensor:
                     other.backward(-grad * self / other ** 2)
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
-
-    def __truediv__(self, other):
-        ''' Gets called when using t / other '''
-
-        return self.div(other)
-
-    def __rtruediv__(self, other):
-        ''' Gets called when using other / t '''
-    
-        return ensure_tensor(other).div(self)
 
     def matmul(self, other):
         ''' Gets the matrix product of the tensor and another tensor '''
@@ -241,15 +186,143 @@ class Tensor:
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __matmul__(self, other):
-        ''' Gets called when using t @ other '''
+    def gt(self, other: Tensorable):
+        ''' Gets the truth value of self > other '''
+        
+        return Tensor(self.data > ensure_tensor(other).data)
+    
+    def ge(self, other: Tensorable):
+        ''' Gets the truth value of self >= other '''
+        
+        return Tensor(self.data >= ensure_tensor(other).data)
+    
+    def lt(self, other: Tensorable):
+        ''' Gets the truth value of self < other '''
+        
+        return Tensor(self.data < ensure_tensor(other).data)
+    
+    def le(self, other: Tensorable):
+        ''' Gets the truth value of self <= other '''
+        
+        return Tensor(self.data <= ensure_tensor(other).data)
+    
+    def eq(self, other: Tensorable):
+        ''' Returns the truth value of self == other '''
+        
+        return Tensor(self.data == ensure_tensor(other).data)
+    
+    def ne(self, other: Tensorable):
+        ''' Gets the truth value of self != other '''
+        
+        return Tensor(self.data != ensure_tensor(other).data)
 
+    def getitem(self, key):
+        ''' Gets called when using t[key] '''
+        
+        if isinstance(key, Tensor):
+            key = key.data
+        
+        elif isinstance(key, (list, tuple)):
+            key_ = []
+            
+            for item in key:
+                if isinstance(item, Tensor):
+                    key_.append(item.data)
+                else:
+                    key_.append(item)
+                   
+            key = tuple(key_) if isinstance(key, tuple) else key_
+            
+        data = self.data[key]
+        requires_grad = self.requires_grad
+        grad_fn = None
+        
+        if requires_grad:
+            def grad_fn(grad: Tensor):
+                grad_ = np.zeros(self.shape)
+                grad_[key] = grad
+                
+                self.backward(ensure_tensor(grad_))
+        
+        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)  
+         
+    def iter(self):
+        ''' Returns an iterator over the tensor '''
+        
+        for i in range(self.data.shape[0]):
+            yield self.getitem(i)
+
+    def __invert__(self):
+        return self.invert()
+
+    def __pos__(self):
+        return self.pos()
+
+    def __neg__(self):
+        return self.neg()
+
+    def __add__(self, other):
+        return self.add(other)
+
+    def __radd__(self, other):
+        return ensure_tensor(other).add(self)
+
+    def __sub__(self, other):
+        return self.sub(other)
+
+    def __rsub__(self, other):
+        return ensure_tensor(other).sub(self)
+
+    def __mul__(self, other):
+        return self.mul(other)
+
+    def __rmul__(self, other):
+        return ensure_tensor(other).mul(self)
+
+    def __truediv__(self, other):
+        return self.div(other)
+
+    def __rtruediv__(self, other):
+        return ensure_tensor(other).div(self)
+
+    def __matmul__(self, other):
         return self.matmul(other)
 
     def __rmatmul__(self, other):
-        ''' Gets called when using other @ t '''
-
         return ensure_tensor(other).matmul(self)
+
+    def __pow__(self, other):
+        return self.power(other)
+
+    def __rpow__(self, other):
+        return ensure_tensor(other).power(self)
+
+    def __abs__(self):
+        return self.abs()
+
+    def __gt__(self, other: Tensorable):
+        return self.gt(other)
+    
+    def __ge__(self, other: Tensorable):
+        return self.ge(other)
+    
+    def __lt__(self, other: Tensorable):
+        return self.lt(other)
+    
+    def __le__(self, other: Tensorable):
+        return self.le(other)
+    
+    def __eq__(self, other):
+        return self.eq(other)
+    
+    def __ne__(self, other):
+        return self.ne(other)
+
+    def __getitem__(self, key):
+        return self.getitem(key)
+        
+    def __iter__(self):
+        return self.iter()
 
     def power(self, other):
         ''' Gets the power of the tensor and another tensor '''
@@ -270,16 +343,6 @@ class Tensor:
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
 
-    def __pow__(self, other):
-        ''' Gets called when using t ** other '''
-
-        return self.power(other)
-
-    def __rpow__(self, other):
-        ''' Gets called when using other ** t '''
-
-        return ensure_tensor(other).power(self)
-
     def abs(self):
         ''' Returns the absolute value of the tensor '''
 
@@ -292,11 +355,6 @@ class Tensor:
                 self.backward(grad * self.sign())
 
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
-
-    def __abs__(self):
-        ''' Gets called when using abs(t) '''
-        
-        return self.abs()
 
     def outer(self, other):
         ''' Returns the outer product of the tensor and another tensor '''
@@ -702,52 +760,6 @@ class Tensor:
         ''' Returns the indices of the minimum values along an axis '''
       
         return Tensor(self.data.argmin(axis=axis, keepdims=keepdims))
-      
-    def getitem(self, key):
-        ''' Gets called when using t[key] '''
-        
-        if isinstance(key, Tensor):
-            key = key.data
-        
-        elif isinstance(key, (list, tuple)):
-            key_ = []
-            
-            for item in key:
-                if isinstance(item, Tensor):
-                    key_.append(item.data)
-                else:
-                    key_.append(item)
-                   
-            key = tuple(key_) if isinstance(key, tuple) else key_
-            
-        data = self.data[key]
-        requires_grad = self.requires_grad
-        grad_fn = None
-        
-        if requires_grad:
-            def grad_fn(grad: Tensor):
-                grad_ = np.zeros(self.shape)
-                grad_[key] = grad
-                
-                self.backward(ensure_tensor(grad_))
-        
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
-
-    def __getitem__(self, key):
-        ''' Gets called when using t[key] '''
-        
-        return self.getitem(key)  
-         
-    def iter(self):
-        ''' Returns an iterator over the tensor '''
-        
-        for i in range(self.data.shape[0]):
-            yield self.getitem(i)
-        
-    def __iter__(self):
-        ''' Gets called when using iter(t) '''
-        
-        return self.iter()
     
     def sign(self):
         ''' Returns the sign of the tensor '''
@@ -761,66 +773,6 @@ class Tensor:
                 self.backward(grad * np.zeros(self.shape))
         
         return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
-    
-    def gt(self, other: Tensorable):
-        ''' Gets the truth value of self > other '''
-        
-        return Tensor(self.data > ensure_tensor(other).data)
-    
-    def __gt__(self, other: Tensorable):
-        ''' Gets called when using t > other '''
-        
-        return self.gt(other)
-    
-    def ge(self, other: Tensorable):
-        ''' Gets the truth value of self >= other '''
-        
-        return Tensor(self.data >= ensure_tensor(other).data)
-    
-    def __ge__(self, other: Tensorable):
-        ''' Gets called when using t >= other '''
-        
-        return self.ge(other)
-    
-    def lt(self, other: Tensorable):
-        ''' Gets the truth value of self < other '''
-        
-        return Tensor(self.data < ensure_tensor(other).data)
-    
-    def __lt__(self, other: Tensorable):
-        ''' Gets called when using t < other '''
-        
-        return self.lt(other)
-    
-    def le(self, other: Tensorable):
-        ''' Gets the truth value of self <= other '''
-        
-        return Tensor(self.data <= ensure_tensor(other).data)
-    
-    def __le__(self, other: Tensorable):
-        ''' Gets called when using t <= other '''
-        
-        return self.le(other)
-    
-    def eq(self, other: Tensorable):
-        ''' Returns the truth value of self == other '''
-        
-        return Tensor(self.data == ensure_tensor(other).data)
-    
-    def __eq__(self, other):
-        ''' Gets called when using t == other '''
-        
-        return self.eq(other)
-    
-    def ne(self, other: Tensorable):
-        ''' Gets the truth value of self != other '''
-        
-        return Tensor(self.data != ensure_tensor(other).data)
-    
-    def __ne__(self, other):
-        ''' Gets called when using t != other '''
-        
-        return self.ne(other)
 
     @property
     def shape(self):
