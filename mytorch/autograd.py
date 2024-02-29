@@ -405,7 +405,7 @@ class Tensor:
 
                 # Compute size of the variance
                 dim_ = list(dim) if isinstance(dim, tuple) else dim
-                size = np.array(self.shape)[dim_].prod() # type: ignore
+                size = np.array(self.shape)[dim_].prod() - correction # type: ignore
 
                 # Compute mean
                 mean = self.data.mean(axis=dim, keepdims=True)
@@ -516,26 +516,6 @@ class Tensor:
         return Tensor(data, None, requires_grad, squeeze_backward)
     
     # Other operations
-
-    def split(self, indices_or_sections: _ShapeLike, dim: SupportsIndex = 0):
-        data = np.split(self.data, indices_or_sections, axis=dim)
-        requires_grad = self.requires_grad
-        
-        tensors: list[Tensor] = []
-
-        for i, item in enumerate(data):
-            split_backward = None
-            
-            if requires_grad:
-                def split_backward(grad: np.ndarray, i=i):
-                    grads = [np.zeros(item.shape) for item in data]
-                    grads[i] = grad
-                    
-                    self.backward(np.concatenate(grads, axis=dim))
-            
-            tensors.append(Tensor(item, None, requires_grad, split_backward))
-
-        return tensors
 
     def concatenate(self, arrays: Sequence[Tensorable], dim: SupportsIndex = 0):
         tensors = [self] + [ensure_tensor(item) for item in arrays]
@@ -910,9 +890,6 @@ def squeeze(input: Tensor, dim: Optional[_ShapeLike] = None):
     return input.squeeze(dim=dim)
 
 # Other operations
-
-def split(input: Tensor, indices_or_sections: _ShapeLike, dim: SupportsIndex = 0):
-    return input.split(indices_or_sections, dim=dim)
 
 def concatenate(arrays: Sequence[Tensor], dim: SupportsIndex = 0):
     return arrays[0].concatenate(arrays[1:], dim=dim)

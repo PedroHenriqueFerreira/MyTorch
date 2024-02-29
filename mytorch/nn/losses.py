@@ -230,8 +230,6 @@ class BCEWithLogitsLoss(Loss):
         
         p = self.sigmoid(p)
         
-        print('---', p)
-        
         loss = -self.weight * (self.pos_weight * y * p.log() + (1 - y) * (1 - p).log())
         
         if self.reduction == 'mean':
