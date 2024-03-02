@@ -79,7 +79,7 @@ class Tensor:
         if requires_grad:
             def sign_backward(grad: np.ndarray):
                 self.backward(grad * np.zeros(self.shape))
-        
+                
         return Tensor(data, None, requires_grad, sign_backward)
 
     def abs(self):
@@ -425,7 +425,10 @@ class Tensor:
                 if self.ndim != grad.ndim and dim is not None:
                     grad = np.expand_dims(grad, dim)
 
-                self.backward(grad * (self.data == self.data.max(axis=dim, keepdims=True)))
+                mask = self.data == self.data.max(axis=dim, keepdims=True)
+                size = mask.sum(axis=dim, keepdims=True)
+
+                self.backward(grad * mask / size)
 
         return Tensor(data, None, requires_grad, max_backward)
 
@@ -440,7 +443,10 @@ class Tensor:
                 if self.ndim != grad.ndim and dim is not None:
                     grad = np.expand_dims(grad, dim)
 
-                self.backward(grad * (self.data == self.data.min(axis=dim, keepdims=True)))
+                mask = self.data == self.data.min(axis=dim, keepdims=True)
+                size = mask.sum(axis=dim, keepdims=True)
+
+                self.backward(grad * mask / size)
 
         return Tensor(data, None, requires_grad, min_backward)
 

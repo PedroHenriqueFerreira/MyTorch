@@ -7,6 +7,8 @@ import numpy as np
 class Optimizer(ABC):
     ''' Base class for all optimizers. '''
     
+    params: list[Tensor]
+    
     @abstractmethod
     def step(self):
         ''' Update the parameters. '''
@@ -17,10 +19,7 @@ class Optimizer(ABC):
         ''' Zero the gradients of the parameters. '''
         
         for param in self.params:
-            if param.grad is None:
-                continue
-            
-            param.zero_grad()      
+            param.grad = None    
 
 class Adadelta(Optimizer):
     ''' Adaptive Delta optimizer. '''
@@ -116,65 +115,6 @@ class Adam(Optimizer):
             
             param.data -= self.lr * m_hat / (np.sqrt(v_hat) + self.eps)
 
-class SGD(Optimizer):
-    ''' Stochastic Gradient Descent optimizer. '''
-    
-    def __init__(
-        self, 
-        params: list[Tensor], 
-        lr: float = 1e-2, 
-        momentum: float = 0,
-        nesterov: bool = False  
-    ):
-        
-        self.params = params
-        self.lr = lr
-        self.momentum = momentum
-        self.nesterov = nesterov
-        
-        self.m = [np.zeros(param.shape) for param in self.params]
-    
-    def step(self):
-        for i, param in enumerate(self.params):
-            
-            if param.grad is None:
-                continue
-            
-            self.m[i] = self.momentum * self.m[i] + self.lr * param.grad
-                
-            if self.nesterov:
-                param.data -= self.momentum * self.m[i] + self.lr * param.grad
-            else:
-                param.data -= self.m[i]
-
-class RMSProp(Optimizer):
-    ''' Root Mean Square Propagation optimizer. '''
-    
-    def __init__(
-        self, 
-        params: list[Tensor], 
-        lr: float = 1e-2, 
-        alpha: float = 0.99,
-        eps: float = 1e-8
-    ):
-        
-        self.params = params
-        self.lr = lr
-        self.alpha = alpha
-        self.eps = eps
-        
-        self.v = [np.zeros(param.shape) for param in self.params]
-    
-    def step(self):
-        for i, param in enumerate(self.params):
-            
-            if param.grad is None:
-                continue
-            
-            self.v[i] = self.alpha * self.v[i] + (1 - self.alpha) * param.grad ** 2
-            
-            param.data -= self.lr * param.grad / (np.sqrt(self.v[i]) + self.eps)
-    
 class Adamax(Optimizer):
     ''' Adam with infinity norm. '''
     
@@ -210,3 +150,63 @@ class Adamax(Optimizer):
             m_hat = self.m[i] / (1 - self.betas[0] ** self.t)
             
             param.data -= self.lr * m_hat / (self.u[i] + self.eps)
+
+class SGD(Optimizer):
+    ''' Stochastic Gradient Descent optimizer. '''
+    
+    def __init__(
+        self, 
+        params: list[Tensor], 
+        lr: float = 1e-3, 
+        momentum: float = 0,
+        nesterov: bool = False  
+    ):
+        
+        self.params = params
+        self.lr = lr
+        self.momentum = momentum
+        self.nesterov = nesterov
+        
+        self.m = [np.zeros(param.shape) for param in self.params]
+    
+    def step(self):
+        for i, param in enumerate(self.params):
+            
+            if param.grad is None:
+                continue
+            
+            self.m[i] = self.momentum * self.m[i] + self.lr * param.grad
+                
+            if self.nesterov:
+                param.data -= self.momentum * self.m[i] + self.lr * param.grad
+            else:
+                param.data -= self.m[i]
+
+class RMSprop(Optimizer):
+    ''' Root Mean Square Propagation optimizer. '''
+    
+    def __init__(
+        self, 
+        params: list[Tensor], 
+        lr: float = 1e-2, 
+        alpha: float = 0.99,
+        eps: float = 1e-8
+    ):
+        
+        self.params = params
+        self.lr = lr
+        self.alpha = alpha
+        self.eps = eps
+        
+        self.v = [np.zeros(param.shape) for param in self.params]
+    
+    def step(self):
+        for i, param in enumerate(self.params):
+            
+            if param.grad is None:
+                continue
+            
+            self.v[i] = self.alpha * self.v[i] + (1 - self.alpha) * param.grad ** 2
+            
+            param.data -= self.lr * param.grad / (np.sqrt(self.v[i]) + self.eps)
+    
