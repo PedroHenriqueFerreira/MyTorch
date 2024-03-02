@@ -7,7 +7,8 @@ import numpy as np
 class Optimizer(ABC):
     ''' Base class for all optimizers. '''
     
-    params: list[Tensor]
+    def __init__(self, params: list[Tensor]):
+        self.params = params
     
     @abstractmethod
     def step(self):
@@ -32,7 +33,8 @@ class Adadelta(Optimizer):
         eps: float = 1e-6
     ):
         
-        self.params = params
+        super().__init__(params)
+        
         self.lr = lr
         self.rho = rho
         self.eps = eps
@@ -62,7 +64,8 @@ class Adagrad(Optimizer):
         eps: float = 1e-8
     ):
         
-        self.params = params
+        super().__init__(params)
+        
         self.lr = lr
         self.eps = eps
         
@@ -89,7 +92,8 @@ class Adam(Optimizer):
         eps: float = 1e-8
     ):
         
-        self.params = params
+        super().__init__(params)
+        
         self.lr = lr
         self.betas = betas
         self.eps = eps
@@ -126,7 +130,8 @@ class Adamax(Optimizer):
         eps: float = 1e-8
     ):
         
-        self.params = params
+        super().__init__(params)
+        
         self.lr = lr
         self.betas = betas
         self.eps = eps
@@ -162,7 +167,8 @@ class SGD(Optimizer):
         nesterov: bool = False  
     ):
         
-        self.params = params
+        super().__init__(params)
+        
         self.lr = lr
         self.momentum = momentum
         self.nesterov = nesterov
@@ -193,7 +199,8 @@ class RMSprop(Optimizer):
         eps: float = 1e-8
     ):
         
-        self.params = params
+        super().__init__(params)
+        
         self.lr = lr
         self.alpha = alpha
         self.eps = eps

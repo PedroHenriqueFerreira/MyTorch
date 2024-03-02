@@ -1,5 +1,3 @@
-import mytorch
-
 from mytorch import Tensor
 import mytorch as mt
 
@@ -29,19 +27,27 @@ class Sigmoid(Activation):
     def forward(self, x: Tensor):
         data = 1 / (1 + np.exp(-x.data))
         requires_grad = x.requires_grad
-        grad_fn = None
+        sigmoid_backward = None
         
         if requires_grad:
-            def grad_fn(grad: np.ndarray):
+            def sigmoid_backward(grad: np.ndarray):
                 x.backward(grad * data * (1 - data))
             
-        return Tensor(data, requires_grad=requires_grad, grad_fn=grad_fn)
+        return Tensor(data, None, requires_grad, sigmoid_backward)
 
 class ReLU(Activation):
     ''' Rectified Linear Unit activation function. '''
 
     def forward(self, x: Tensor):
-        return x.maximum(0)
+        data = np.where(x.data > 0, x.data, 0)
+        requires_grad = x.requires_grad
+        relu_backward = None
+        
+        if requires_grad:
+            def relu_backward(grad: np.ndarray):
+                x.backward(grad * (x.data > 0))
+        
+        return Tensor(data, None, requires_grad, relu_backward)
 
 class LeakyReLU(Activation):
     ''' Leaky Rectified Linear Unit activation function. '''
@@ -50,13 +56,29 @@ class LeakyReLU(Activation):
         self.alpha = alpha
 
     def forward(self, x: Tensor):
-        return (x > 0).where(x, self.alpha * x)
+        data = np.where(x.data > 0, x.data, self.alpha * x.data)
+        requires_grad = x.requires_grad
+        leaky_relu_backward = None
+
+        if requires_grad:
+            def leaky_relu_backward(grad: np.ndarray):
+                x.backward(grad * np.where(data > 0, 1, self.alpha))
+                
+        return Tensor(data, None, requires_grad, leaky_relu_backward)
 
 class Tanh(Activation):
     ''' Hyperbolic Tangent activation function. '''
 
     def forward(self, x: Tensor):
-        return x.tanh()
+        data = np.tanh(x.data)
+        requires_grad = x.requires_grad
+        tanh_backward = None
+        
+        if requires_grad:
+            def tanh_backward(grad: np.ndarray):
+                x.backward(grad * (1 - data ** 2))
+                
+        return Tensor(data, None, requires_grad, tanh_backward)
 
 class Softplus(Activation):
     ''' Softplus activation function. '''
@@ -105,6 +127,6 @@ class Softmax(Activation):
         self.axis = axis
 
     def forward(self, x: Tensor):
-        e_x = mt.exp(x - x.max(axis=self.axis, keepdims=True))
+        e_x = mt.exp(x - x.max(dim=self.axis, keepdim=True))
 
-        return e_x / e_x.sum(axis=self.axis, keepdims=True)
+        return e_x / e_x.sum(dim=self.axis, keepdim=True)
