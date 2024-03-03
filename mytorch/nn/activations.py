@@ -35,6 +35,23 @@ class Sigmoid(Activation):
             
         return Tensor(data, None, requires_grad, sigmoid_backward)
 
+class LogSigmoid(Activation):
+    ''' Logarithm of the Sigmoid activation function. '''
+
+    def forward(self, x: Tensor):
+        condition = x.data >= -20
+        
+        data = np.where(condition, np.log(1 / (1 + np.exp(-x.data))), x.data)
+        
+        requires_grad = x.requires_grad
+        log_sigmoid_backward = None
+        
+        if requires_grad:
+            def log_sigmoid_backward(grad: np.ndarray):
+                x.backward(grad * np.where(condition, 1 - (1 / (1 + np.exp(-x.data))), 1))
+                
+        return Tensor(data, None, requires_grad, log_sigmoid_backward)
+
 class ReLU(Activation):
     ''' Rectified Linear Unit activation function. '''
 
@@ -83,17 +100,56 @@ class Tanh(Activation):
 class Softplus(Activation):
     ''' Softplus activation function. '''
 
-    def __init__(self, beta: float = 1):
+    def __init__(self, beta: float = 1, threshold: float = 20):
         self.beta = beta
+        self.threshold = threshold
 
     def forward(self, x: Tensor):
-        return (1 / self.beta) * (1 + (self.beta * x).exp()).log()
+        condition = x.data * self.beta <= self.threshold
+        
+        data = np.where(condition, (1 / self.beta) * np.log(1 + np.exp(self.beta * x.data)), x.data)
+        
+        requires_grad = x.requires_grad
+        softplus_backward = None
+        
+        if requires_grad:
+            def softplus_backward(grad: np.ndarray):
+                x.backward(grad / np.where(condition, 1 + np.exp(-self.beta * x.data), 1))    
+
+        return Tensor(data, None, requires_grad, softplus_backward)
 
 class Softsign(Activation):
     ''' Softsign activation function. '''
 
     def forward(self, x: Tensor):
-        return x / (1 + x.abs())
+        data = x.data / (1 + np.abs(x.data))
+        requires_grad = x.requires_grad
+        softsign_backward = None
+        
+        if requires_grad:
+            def softsign_backward(grad: np.ndarray):
+                x.backward(grad / (1 + np.abs(x.data)) ** 2)
+        
+        return Tensor(data, None, requires_grad, softsign_backward)
+
+class SiLU(Activation):
+    ''' Sigmoid Linear Unit activation function. '''
+    
+    def __init__(self):
+        self.sigmoid = Sigmoid()
+    
+    def forward(self, x: Tensor):
+        return x * self.sigmoid(x)
+
+class Mish(Activation):
+    ''' Mish activation function. '''
+
+    def __init__(self):
+        self.softplus = Softplus()
+        self.tanh = Tanh()
+
+    def forward(self, x: Tensor):
+        return x * self.tanh(self.softplus(x))
 
 class ELU(Activation):
     ''' Exponential Linear Unit activation function. '''

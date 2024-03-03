@@ -156,6 +156,35 @@ class Adamax(Optimizer):
             
             param.data -= self.lr * m_hat / (self.u[i] + self.eps)
 
+class RMSprop(Optimizer):
+    ''' Root Mean Square Propagation optimizer. '''
+    
+    def __init__(
+        self, 
+        params: list[Tensor], 
+        lr: float = 1e-2, 
+        alpha: float = 0.99,
+        eps: float = 1e-8
+    ):
+        
+        super().__init__(params)
+        
+        self.lr = lr
+        self.alpha = alpha
+        self.eps = eps
+        
+        self.v = [np.zeros(param.shape) for param in self.params]
+    
+    def step(self):
+        for i, param in enumerate(self.params):
+            
+            if param.grad is None:
+                continue
+            
+            self.v[i] = self.alpha * self.v[i] + (1 - self.alpha) * param.grad ** 2
+            
+            param.data -= self.lr * param.grad / (np.sqrt(self.v[i]) + self.eps)
+    
 class SGD(Optimizer):
     ''' Stochastic Gradient Descent optimizer. '''
     
@@ -187,33 +216,3 @@ class SGD(Optimizer):
                 param.data -= self.momentum * self.m[i] + self.lr * param.grad
             else:
                 param.data -= self.m[i]
-
-class RMSprop(Optimizer):
-    ''' Root Mean Square Propagation optimizer. '''
-    
-    def __init__(
-        self, 
-        params: list[Tensor], 
-        lr: float = 1e-2, 
-        alpha: float = 0.99,
-        eps: float = 1e-8
-    ):
-        
-        super().__init__(params)
-        
-        self.lr = lr
-        self.alpha = alpha
-        self.eps = eps
-        
-        self.v = [np.zeros(param.shape) for param in self.params]
-    
-    def step(self):
-        for i, param in enumerate(self.params):
-            
-            if param.grad is None:
-                continue
-            
-            self.v[i] = self.alpha * self.v[i] + (1 - self.alpha) * param.grad ** 2
-            
-            param.data -= self.lr * param.grad / (np.sqrt(self.v[i]) + self.eps)
-    
