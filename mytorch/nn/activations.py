@@ -38,19 +38,11 @@ class Sigmoid(Activation):
 class LogSigmoid(Activation):
     ''' Logarithm of the Sigmoid activation function. '''
 
+    def __init__(self):
+        self.softplus = Softplus()
+
     def forward(self, x: Tensor):
-        condition = x.data >= -20
-        
-        data = np.where(condition, np.log(1 / (1 + np.exp(-x.data))), x.data)
-        
-        requires_grad = x.requires_grad
-        log_sigmoid_backward = None
-        
-        if requires_grad:
-            def log_sigmoid_backward(grad: np.ndarray):
-                x.backward(grad * np.where(condition, 1 - (1 / (1 + np.exp(-x.data))), 1))
-                
-        return Tensor(data, None, requires_grad, log_sigmoid_backward)
+        return -self.softplus(-x)
 
 class ReLU(Activation):
     ''' Rectified Linear Unit activation function. '''
