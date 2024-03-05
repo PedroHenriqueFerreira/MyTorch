@@ -150,7 +150,15 @@ class ELU(Activation):
         self.alpha = alpha
 
     def forward(self, x: Tensor):
-        return (x > 0).where(x, self.alpha * (x.exp() - 1))
+        data = np.where(x.data > 0, x.data, self.alpha * (np.exp(x.data) - 1))
+        requires_grad = x.requires_grad
+        elu_backward = None
+        
+        if requires_grad:
+            def elu_backward(grad: np.ndarray):
+                x.backward(grad * np.where(data > 0, 1, self.alpha * np.exp(x.data)))
+        
+        return Tensor(data, None, requires_grad, elu_backward)
 
 class SELU(Activation):
     ''' Scaled Exponential Linear Unit activation function. '''
@@ -160,13 +168,35 @@ class SELU(Activation):
         self.alpha = 1.6732632423543772848170429916717
 
     def forward(self, x: Tensor):
-        return self.scale * (x > 0).where(x, self.alpha * (mt.exp(x) - 1))
+        data =self.scale * np.where(x.data > 0, x.data, self.alpha * (np.exp(x.data) - 1))
+        requires_grad = x.requires_grad
+        selu_backward = None
+        
+        if requires_grad:
+            def selu_backward(grad: np.ndarray):
+                x.backward(grad * self.scale * np.where(data > 0, 1, self.alpha * np.exp(x.data)))
+
+        return Tensor(data, None, requires_grad, selu_backward)
 
 class GELU(Activation):
     ''' Gaussian Error Linear Unit activation function. '''
 
     def forward(self, x: Tensor):
-        return 0.5 * x * (1 + (sqrt(2 / pi) * (x + 0.044715 * x ** 3)).tanh())
+        data = 0.5 * x.data * (1 + np.tanh(np.sqrt(2 / np.pi) * (x.data + 0.044715 * x.data ** 3)))
+        requires_grad = x.requires_grad
+        gelu_backward = None
+        
+        if requires_grad:
+            def gelu_backward(grad: np.ndarray):
+                x.backward(
+                    grad * (
+                        0.5 * np.tanh(0.0356774 * x.data ** 3 + 0.797885 * x.data) 
+                        + (0.0535161 * x.data ** 3 + 0.398942 * x.data) 
+                        * (1 / np.cosh(0.0356774 * x ** 3 + 0.797885 * x)) ** 2
+                    )
+                )
+        
+        return Tensor(data, None, requires_grad, gelu_backward)
 
 class Softmax(Activation):
     ''' Softmax activation function. '''
