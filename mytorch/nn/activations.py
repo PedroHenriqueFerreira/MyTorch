@@ -1,11 +1,7 @@
-from mytorch import Tensor
-import mytorch as mt
-
+from abc import ABC, abstractmethod
 import numpy as np
 
-from abc import ABC, abstractmethod
-
-from math import pi, sqrt
+from mytorch import Tensor
 
 class Activation(ABC):
     ''' Base class for all loss functions. '''
@@ -182,17 +178,19 @@ class GELU(Activation):
     ''' Gaussian Error Linear Unit activation function. '''
 
     def forward(self, x: Tensor):
+        
         data = 0.5 * x.data * (1 + np.tanh(np.sqrt(2 / np.pi) * (x.data + 0.044715 * x.data ** 3)))
         requires_grad = x.requires_grad
         gelu_backward = None
         
-        if requires_grad:
+        if requires_grad:   
             def gelu_backward(grad: np.ndarray):
                 x.backward(
                     grad * (
                         0.5 * np.tanh(0.0356774 * x.data ** 3 + 0.797885 * x.data) 
                         + (0.0535161 * x.data ** 3 + 0.398942 * x.data) 
-                        * (1 / np.cosh(0.0356774 * x ** 3 + 0.797885 * x)) ** 2
+                        * (1 / np.cosh(0.0356774 * x.data ** 3 + 0.797885 * x.data)) ** 2
+                        + 0.5
                     )
                 )
         
@@ -201,10 +199,10 @@ class GELU(Activation):
 class Softmax(Activation):
     ''' Softmax activation function. '''
 
-    def __init__(self, axis: int = 1):
-        self.axis = axis
+    def __init__(self, dim: int = 1):
+        self.dim = dim
 
     def forward(self, x: Tensor):
-        e_x = mt.exp(x - x.max(dim=self.axis, keepdim=True))
+        e_x = (x - x.max(dim=self.dim, keepdim=True)).exp()
 
-        return e_x / e_x.sum(dim=self.axis, keepdim=True)
+        return e_x / e_x.sum(dim=self.dim, keepdim=True)
