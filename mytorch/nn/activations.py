@@ -17,19 +17,39 @@ class Activation(ABC):
 
         return self.forward(x)
 
-class Sigmoid(Activation):
-    ''' Sigmoid activation function. '''
+class ELU(Activation):
+    ''' Exponential Linear Unit activation function. '''
+
+    def __init__(self, alpha: float = 1.0):
+        self.alpha = alpha
 
     def forward(self, x: Tensor):
-        data = 1 / (1 + np.exp(-x.data))
+        data = np.where(x.data > 0, x.data, self.alpha * (np.exp(x.data) - 1))
         requires_grad = x.requires_grad
-        sigmoid_backward = None
+        elu_backward = None
         
         if requires_grad:
-            def sigmoid_backward(grad: np.ndarray):
-                x.backward(grad * data * (1 - data))
-            
-        return Tensor(data, None, requires_grad, sigmoid_backward)
+            def elu_backward(grad: np.ndarray):
+                x.backward(grad * np.where(data > 0, 1, self.alpha * np.exp(x.data)))
+        
+        return Tensor(data, None, requires_grad, elu_backward)
+
+class LeakyReLU(Activation):
+    ''' Leaky Rectified Linear Unit activation function. '''
+
+    def __init__(self, alpha: float = 0.01):
+        self.alpha = alpha
+
+    def forward(self, x: Tensor):
+        data = np.where(x.data > 0, x.data, self.alpha * x.data)
+        requires_grad = x.requires_grad
+        leaky_relu_backward = None
+
+        if requires_grad:
+            def leaky_relu_backward(grad: np.ndarray):
+                x.backward(grad * np.where(data > 0, 1, self.alpha))
+                
+        return Tensor(data, None, requires_grad, leaky_relu_backward)
 
 class LogSigmoid(Activation):
     ''' Logarithm of the Sigmoid activation function. '''
@@ -53,108 +73,6 @@ class ReLU(Activation):
                 x.backward(grad * (x.data > 0))
         
         return Tensor(data, None, requires_grad, relu_backward)
-
-class LeakyReLU(Activation):
-    ''' Leaky Rectified Linear Unit activation function. '''
-
-    def __init__(self, alpha: float = 0.01):
-        self.alpha = alpha
-
-    def forward(self, x: Tensor):
-        data = np.where(x.data > 0, x.data, self.alpha * x.data)
-        requires_grad = x.requires_grad
-        leaky_relu_backward = None
-
-        if requires_grad:
-            def leaky_relu_backward(grad: np.ndarray):
-                x.backward(grad * np.where(data > 0, 1, self.alpha))
-                
-        return Tensor(data, None, requires_grad, leaky_relu_backward)
-
-class Tanh(Activation):
-    ''' Hyperbolic Tangent activation function. '''
-
-    def forward(self, x: Tensor):
-        data = np.tanh(x.data)
-        requires_grad = x.requires_grad
-        tanh_backward = None
-        
-        if requires_grad:
-            def tanh_backward(grad: np.ndarray):
-                x.backward(grad * (1 - data ** 2))
-                
-        return Tensor(data, None, requires_grad, tanh_backward)
-
-class Softplus(Activation):
-    ''' Softplus activation function. '''
-
-    def __init__(self, beta: float = 1, threshold: float = 20):
-        self.beta = beta
-        self.threshold = threshold
-
-    def forward(self, x: Tensor):
-        condition = x.data * self.beta <= self.threshold
-        
-        data = np.where(condition, (1 / self.beta) * np.log(1 + np.exp(self.beta * x.data)), x.data)
-        
-        requires_grad = x.requires_grad
-        softplus_backward = None
-        
-        if requires_grad:
-            def softplus_backward(grad: np.ndarray):
-                x.backward(grad / np.where(condition, 1 + np.exp(-self.beta * x.data), 1))    
-
-        return Tensor(data, None, requires_grad, softplus_backward)
-
-class Softsign(Activation):
-    ''' Softsign activation function. '''
-
-    def forward(self, x: Tensor):
-        data = x.data / (1 + np.abs(x.data))
-        requires_grad = x.requires_grad
-        softsign_backward = None
-        
-        if requires_grad:
-            def softsign_backward(grad: np.ndarray):
-                x.backward(grad / (1 + np.abs(x.data)) ** 2)
-        
-        return Tensor(data, None, requires_grad, softsign_backward)
-
-class SiLU(Activation):
-    ''' Sigmoid Linear Unit activation function. '''
-    
-    def __init__(self):
-        self.sigmoid = Sigmoid()
-    
-    def forward(self, x: Tensor):
-        return x * self.sigmoid(x)
-
-class Mish(Activation):
-    ''' Mish activation function. '''
-
-    def __init__(self):
-        self.softplus = Softplus()
-        self.tanh = Tanh()
-
-    def forward(self, x: Tensor):
-        return x * self.tanh(self.softplus(x))
-
-class ELU(Activation):
-    ''' Exponential Linear Unit activation function. '''
-
-    def __init__(self, alpha: float = 1.0):
-        self.alpha = alpha
-
-    def forward(self, x: Tensor):
-        data = np.where(x.data > 0, x.data, self.alpha * (np.exp(x.data) - 1))
-        requires_grad = x.requires_grad
-        elu_backward = None
-        
-        if requires_grad:
-            def elu_backward(grad: np.ndarray):
-                x.backward(grad * np.where(data > 0, 1, self.alpha * np.exp(x.data)))
-        
-        return Tensor(data, None, requires_grad, elu_backward)
 
 class SELU(Activation):
     ''' Scaled Exponential Linear Unit activation function. '''
@@ -195,6 +113,88 @@ class GELU(Activation):
                 )
         
         return Tensor(data, None, requires_grad, gelu_backward)
+
+class Sigmoid(Activation):
+    ''' Sigmoid activation function. '''
+
+    def forward(self, x: Tensor):
+        data = 1 / (1 + np.exp(-x.data))
+        requires_grad = x.requires_grad
+        sigmoid_backward = None
+        
+        if requires_grad:
+            def sigmoid_backward(grad: np.ndarray):
+                x.backward(grad * data * (1 - data))
+            
+        return Tensor(data, None, requires_grad, sigmoid_backward)
+
+class SiLU(Activation):
+    ''' Sigmoid Linear Unit activation function. '''
+    
+    def __init__(self):
+        self.sigmoid = Sigmoid()
+    
+    def forward(self, x: Tensor):
+        return x * self.sigmoid(x)
+
+class Mish(Activation):
+    ''' Mish activation function. '''
+
+    def __init__(self):
+        self.softplus = Softplus()
+        self.tanh = Tanh()
+
+    def forward(self, x: Tensor):
+        return x * self.tanh(self.softplus(x))
+
+class Softplus(Activation):
+    ''' Softplus activation function. '''
+
+    def __init__(self, beta: float = 1, threshold: float = 20):
+        self.beta = beta
+        self.threshold = threshold
+
+    def forward(self, x: Tensor):
+        condition = x.data * self.beta <= self.threshold
+        
+        data = np.where(condition, (1 / self.beta) * np.log(1 + np.exp(self.beta * x.data)), x.data)
+        
+        requires_grad = x.requires_grad
+        softplus_backward = None
+        
+        if requires_grad:
+            def softplus_backward(grad: np.ndarray):
+                x.backward(grad / np.where(condition, 1 + np.exp(-self.beta * x.data), 1))    
+
+        return Tensor(data, None, requires_grad, softplus_backward)
+
+class Softsign(Activation):
+    ''' Softsign activation function. '''
+
+    def forward(self, x: Tensor):
+        data = x.data / (1 + np.abs(x.data))
+        requires_grad = x.requires_grad
+        softsign_backward = None
+        
+        if requires_grad:
+            def softsign_backward(grad: np.ndarray):
+                x.backward(grad / (1 + np.abs(x.data)) ** 2)
+        
+        return Tensor(data, None, requires_grad, softsign_backward)
+
+class Tanh(Activation):
+    ''' Hyperbolic Tangent activation function. '''
+
+    def forward(self, x: Tensor):
+        data = np.tanh(x.data)
+        requires_grad = x.requires_grad
+        tanh_backward = None
+        
+        if requires_grad:
+            def tanh_backward(grad: np.ndarray):
+                x.backward(grad * (1 - data ** 2))
+                
+        return Tensor(data, None, requires_grad, tanh_backward)
 
 class Softmax(Activation):
     ''' Softmax activation function. '''

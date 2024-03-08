@@ -1,8 +1,9 @@
 import mytorch
-from mytorch.nn import Softmax
+from mytorch.nn import MSELoss
 
-x1 = mytorch.tensor([[-10000, -1000, 1, 0, -200, -100, -50, -20, -10], [-5, -1, 1, 0, 0, 1, 20, 1000, 1000]], dtype=mytorch.float64, requires_grad=True)
-y1 = Softmax()(x1)
+p1 = mytorch.tensor([0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1])
+x1 = mytorch.tensor([-1000, -100, -10, -1, 0, 1, 10, 100, 1000, 1, 0], dtype=mytorch.float64, requires_grad=True)
+y1 = MSELoss()(p1, x1)
 
 print(y1)
 
@@ -13,10 +14,11 @@ print(x1.grad)
 print('-' * 50)
 
 import torch
-from torch.nn import Softmax as TSoftmax
+from torch.nn import MSELoss as TMSELoss
 
-x2 = torch.tensor([[-10000, -1000, 1, 0, -200, -100, -50, -20, -10], [-5, -1, 1, 0, 0, 1, 20, 1000, 1000]], dtype=torch.float64, requires_grad=True)
-y2 = TSoftmax()(x2)
+p2 = torch.tensor([0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1], dtype=torch.float64, requires_grad=True)
+x2 = torch.tensor([-1000, -100, -10, -1, 0, 1, 10, 100, 1000, 1, 0], dtype=torch.float64, requires_grad=True)
+y2 = TMSELoss()(p2, x2)
 
 print(y2)
 
