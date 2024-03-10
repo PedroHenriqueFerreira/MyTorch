@@ -126,14 +126,21 @@ class Tensor:
             
         return Tensor(data, None, requires_grad, sqrt_backward)
 
-    def log(self):
+    def log(self, safe: bool = False):
         data = np.log(self.data)
+        
+        if safe:
+            data = data.clip(min=-100)
+        
         requires_grad = self.requires_grad
         log_backward = None
 
         if requires_grad:
             def log_backward(grad: np.ndarray):
-                self.backward(grad / self.data)
+                if safe:
+                    self.backward(grad / self.data.clip(min=1e-12))
+                else:
+                    self.backward(grad / self.data)
 
         return Tensor(data, None, requires_grad, log_backward)
 
@@ -814,8 +821,8 @@ def negative(input: Tensor):
 def sqrt(input: Tensor):
     return input.sqrt()
 
-def log(input: Tensor):
-    return input.log()
+def log(input: Tensor, safe: bool = False):
+    return input.log(safe)
 
 def exp(input: Tensor):
     return input.exp()
