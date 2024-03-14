@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
+from typing import Literal
 
 import mytorch
 from mytorch import Tensor
+from mytorch.nn import ReLU, Tanh
 
 class Layer(ABC):
     ''' Abstract class for layers. '''
@@ -48,3 +50,25 @@ class Linear(Layer):
             
         return y
     
+class RNN(Layer):
+    ''' Recurrent Neural Network layer. '''
+    
+    def __init__(
+        self, 
+        input_size: int, 
+        hidden_size: int, 
+        nonlinearity: Literal['tanh', 'relu'] = 'tanh',
+        bias: bool = True,
+        cycled_states: bool = False,
+        return_sequences: Literal['all', 'last', 'both'] = 'both'
+    ):
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.nonlinearity = (Tanh() if nonlinearity == 'tanh' else ReLU())
+        self.cycled_states = cycled_states
+        self.return_sequences = return_sequences
+        
+        stdv = 1 / hidden_size ** 0.5
+        
+        self.weight = mytorch.uniform(-stdv, stdv, (hidden_size, input_size), mytorch.float32, True)
+        self.
