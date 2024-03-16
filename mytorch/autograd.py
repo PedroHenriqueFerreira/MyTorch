@@ -24,12 +24,16 @@ class Tensor:
         self.grad: Optional[np.ndarray] = None
 
     def __repr__(self):
+        data = self.data.round(4)
+        dtype = self.dtype
+        grad_fn = self.grad_fn.__name__
+        
         if self.grad_fn:
-            return f'tensor({self.data}, dtype={self.dtype}, grad_fn=<{self.grad_fn.__name__}>)'
+            return f'tensor({data}, dtype={dtype}, grad_fn=<{grad_fn}>)'
         elif self.requires_grad:
-            return f'tensor({self.data}, dtype={self.dtype}, requires_grad=True)'
+            return f'tensor({data}, dtype={dtype}, requires_grad=True)'
         else:
-            return f'tensor({self.data}, dtype={self.dtype})'
+            return f'tensor({data}, dtype={dtype})'
     
     # Boolean operations (non gradient)
 
@@ -530,7 +534,26 @@ class Tensor:
     
     # Other operations
 
-    def concatenate(self, arrays: Sequence[Tensorable], dim: SupportsIndex = 0):
+    def stack(self, arrays: Sequence[Tensorable], dim: SupportsIndex = 0):
+        tensors = [self] + [ensure_tensor(item) for item in arrays]
+        
+        data = np.stack([t.data for t in tensors], axis=dim)
+        requires_grad = any(t.requires_grad for t in tensors)
+        stack_backward = None
+        
+        if requires_grad:
+            def stack_backward(grad: np.ndarray):
+                grads = np.split(grad, len(tensors), axis=dim)
+        
+                for tensor, grad in zip(tensors, grads):
+                    if not tensor.requires_grad:
+                        continue
+                        
+                    tensor.backward(grad.reshape(tensor.shape))
+
+        return Tensor(data, None, requires_grad, stack_backward)
+
+    def cat(self, arrays: Sequence[Tensorable], dim: SupportsIndex = 0):
         tensors = [self] + [ensure_tensor(item) for item in arrays]
 
         data = np.concatenate([t.data for t in tensors], axis=dim)
@@ -758,13 +781,10 @@ def rand(*shape: int, dtype: DTypeLike = None, requires_grad = False):
 def randn(*shape: int, dtype: DTypeLike = None, requires_grad = False):
     return Tensor(np.random.randn(*shape), dtype=dtype, requires_grad=requires_grad)
 
-def uniform(
-    low: float,
-    high: float, 
-    shape: Optional[_ShapeLike] = None, 
-    dtype: DTypeLike = None, 
-    requires_grad = False
-):
+def binomial(n: int, p: float, shape: Optional[_ShapeLike] = None, dtype: DTypeLike = None, requires_grad = False):
+    return Tensor(np.random.binomial(n, p, shape), dtype=dtype, requires_grad=requires_grad)
+
+def uniform(low: float, high: float, shape: Optional[_ShapeLike] = None, dtype: DTypeLike = None, requires_grad = False):
     return Tensor(np.random.uniform(low, high, shape), dtype=dtype, requires_grad=requires_grad)
 
 def arange(start = 0, stop = 0, step = 1, dtype: DTypeLike = None, requires_grad = False):
@@ -904,8 +924,11 @@ def squeeze(input: Tensor, dim: Optional[_ShapeLike] = None):
 
 # Other operations
 
-def concatenate(arrays: Sequence[Tensor], dim: SupportsIndex = 0):
-    return arrays[0].concatenate(arrays[1:], dim=dim)
+def stack(arrays: Sequence[Tensor], dim: SupportsIndex = 0):
+    return arrays[0].stack(arrays[1:], dim=dim)
+
+def cat(arrays: Sequence[Tensor], dim: SupportsIndex = 0):
+    return arrays[0].cat(arrays[1:], dim=dim)
 
 def where(condition: Tensor, input: Tensor, other: Tensor):
     return input.where(condition, other)

@@ -23,6 +23,26 @@ class Layer(ABC):
     def __call__(self, x: Tensor, *args) -> Tensor:
         return self.forward(x, *args)
     
+    def eval(self):
+        ''' Sets the layer to evaluation mode. '''
+        
+        if hasattr(self, 'training'):
+            self.training = False
+            
+        for item in self.__dict__.values():
+            if isinstance(item, Layer):
+                item.eval()
+                
+    def train(self, mode: bool = True):
+        ''' Sets the layer to training mode. '''
+        
+        if hasattr(self, 'training'):
+            self.training = mode
+            
+        for item in self.__dict__.values():
+            if isinstance(item, Layer):
+                item.train(mode)
+    
 class Linear(Layer):
     ''' Linear layer. '''
 
@@ -93,6 +113,26 @@ class RNNCell(Layer):
             
         return self.nonlinearity(y)
     
+class Dropout(Layer):
+    ''' Randomly zeroes some of the elements of the input tensor with probability p. '''
+
+    def __init__(self, p: float = 0.5):
+        self.p = p
+        
+        self.training = True
+        self.scale = 1 / (1 - p)
+    
+    def named_parameters(self):
+        return []
+    
+    def forward(self, x: Tensor):
+        if self.training:
+            mask = mytorch.binomial(1, 1 - self.p, x.shape, mytorch.float32) * self.scale
+        else:
+            mask = 1
+            
+        return x * mask
+
 class RNN(Layer):
     ''' Elman RNN '''
     
@@ -103,19 +143,24 @@ class RNN(Layer):
         num_layers: int, 
         nonlinearity: Literal['tanh', 'relu'] = 'tanh', 
         bias: bool = True, 
-        batch_first: bool = False, # Ignored
-        dropout: float = 0, # Ignored
+        batch_first: bool = False,
+        dropout: float = 0,
         bidirectional: bool = False # Ignored
     ):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.nonlinearity = Tanh() if nonlinearity == 'tanh' else ReLU()
         self.bias = bias
         
         self.batch_first = batch_first
-        self.dropout = dropout
         self.bidirectional = bidirectional
+        
+        self.directions = 2 if bidirectional else 1
+        
+        if dropout > 0:
+            self.dropout = Dropout(dropout)
+        else:
+            self.dropout = None
         
         self.cells = [RNNCell(input_size, hidden_size, bias, nonlinearity)]
         
@@ -132,19 +177,32 @@ class RNN(Layer):
         return parameters
     
     def forward(self, x: Tensor, hx: Optional[Tensor] = None) -> Tensor:
+        batch_size = x.shape[0] if self.batch_first else x.shape[1]
+        sequence_size = x.shape[1] if self.batch_first else x.shape[0]
+        
         if hx is None:
-            hx = mytorch.zeros((self.num_layers, x.shape[1], self.hidden_size), mytorch.float32)
+            hx = mytorch.zeros((self.num_layers, batch_size, self.hidden_size), mytorch.float32)
         
         hx_list = [hx[i] for i in range(self.num_layers)]
         out_list: list[Tensor] = []
         
-        for i in range(x.shape[0]):
+        for i in range(sequence_size):
             for j in range(self.num_layers):
                 if j == 0:
-                    hx_list[j] = self.cells[j](x[i], hx_list[j])
+                    inp = x[:, i] if self.batch_first else x[i]
+                    
+                    hx_list[j] = self.cells[j](inp, hx_list[j])
                 else:
                     hx_list[j] = self.cells[j](hx_list[j - 1], hx_list[j])
             
+                if j < self.num_layers - 1 and self.dropout is not None:
+                    hx_list[j] = self.dropout(hx_list[j])
+            
             out_list.append(hx_list[-1])
         
-        return mytorch.concatenate(out_list), mytorch.concatenate(hx_list)
+        out = mytorch.stack(out_list)
+        output = out.swapaxes(0, 1) if self.batch_first else out
+        
+        h_n = mytorch.stack(hx_list)
+        
+        return output, h_n
