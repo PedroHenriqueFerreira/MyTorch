@@ -103,8 +103,8 @@ class RNN(Layer):
         num_layers: int, 
         nonlinearity: Literal['tanh', 'relu'] = 'tanh', 
         bias: bool = True, 
-        batch_first: bool = False, 
-        dropout: float = 0,
+        batch_first: bool = False, # Ignored
+        dropout: float = 0, # Ignored
         bidirectional: bool = False # Ignored
     ):
         self.input_size = input_size
@@ -123,27 +123,28 @@ class RNN(Layer):
             self.cells.append(RNNCell(hidden_size, hidden_size, bias, nonlinearity))
             
     def named_parameters(self):
-        return []
+        parameters: list[tuple[str, Tensor]] = []
+        
+        for i, cell in enumerate(self.cells):
+            for name, parameter in cell.named_parameters():
+                parameters.append((f'{name}_{i}', parameter))
+        
+        return parameters
     
     def forward(self, x: Tensor, hx: Optional[Tensor] = None) -> Tensor:
         if hx is None:
             hx = mytorch.zeros((self.num_layers, x.shape[1], self.hidden_size), mytorch.float32)
         
-        hidden = [hx[i] for i in range(self.num_layers)]
-        
-        outs: list[Tensor] = []
+        hx_list = [hx[i] for i in range(self.num_layers)]
+        out_list: list[Tensor] = []
         
         for i in range(x.shape[0]):
             for j in range(self.num_layers):
                 if j == 0:
-                    hidden_l = self.cells[j](x[i], hidden[j])
+                    hx_list[j] = self.cells[j](x[i], hx_list[j])
                 else:
-                    hidden_l = self.cells[j](hidden[j - 1], hidden[j])
-                    
-                hidden[j] = hidden_l
+                    hx_list[j] = self.cells[j](hx_list[j - 1], hx_list[j])
             
-            outs.append(hidden_l)
+            out_list.append(hx_list[-1])
         
-        saida =
-        
-        return outs, hidden
+        return mytorch.concatenate(out_list), mytorch.concatenate(hx_list)
