@@ -1,17 +1,9 @@
-import torch
-from torch.nn import Linear
+from mytorch import nn
+import mytorch
 
-torch.no_grad
+rnn = nn.RNN(10, 20, 2)
+input = mytorch.randn(5, 3, 10)
+h0 = mytorch.randn(2, 3, 20)
+output, hn = rnn(input, h0)
 
-a = Linear(2, 2)
-
-a.eval()
-
-print(dict(a.named_parameters()))
-print(a.weight)
-print(a.bias)
-
-y = a(torch.tensor([1., 2.]))
-
-print('-----------------')
-print(y)
+print(len(output), output[0].shape)

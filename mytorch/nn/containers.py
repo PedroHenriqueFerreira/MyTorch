@@ -46,8 +46,9 @@ class Module(Container):
             
             if hasattr(item, 'named_parameters'):
                 for name, param in item.named_parameters():
-                    if param.requires_grad:
-                        params.append(param)
+                    if hasattr(param, 'requires_grad'):
+                        if param.requires_grad:
+                            params.append(param)
 
         return params
     
@@ -92,8 +93,9 @@ class Sequential(Container):
             
             if hasattr(layer, 'named_parameters'):
                 for name, param in layer.named_parameters():
-                    if param.requires_grad:
-                        params.append(param)
+                    if hasattr(param, 'requires_grad'):
+                        if param.requires_grad:
+                            params.append(param)
             
         return params
     
