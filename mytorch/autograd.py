@@ -24,16 +24,12 @@ class Tensor:
         self.grad: Optional[np.ndarray] = None
 
     def __repr__(self):
-        data = self.data.round(4)
-        dtype = self.dtype
-        grad_fn = self.grad_fn.__name__
-        
         if self.grad_fn:
-            return f'tensor({data}, dtype={dtype}, grad_fn=<{grad_fn}>)'
+            return f'tensor({self.data.round(4)}, dtype={self.dtype}, grad_fn=<{self.grad_fn.__name__}>)'
         elif self.requires_grad:
-            return f'tensor({data}, dtype={dtype}, requires_grad=True)'
+            return f'tensor({self.data.round(4)}, dtype={self.dtype}, requires_grad=True)'
         else:
-            return f'tensor({data}, dtype={dtype})'
+            return f'tensor({self.data.round(4)}, dtype={self.dtype})'
     
     # Boolean operations (non gradient)
 
