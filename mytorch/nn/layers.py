@@ -148,7 +148,7 @@ class RNN(Layer):
         self,
         input_size: int,
         hidden_size: int,
-        num_layers: int,
+        num_layers: int = 1,
         nonlinearity: Literal['tanh', 'relu'] = 'tanh',
         bias: bool = True,
         batch_first: bool = False,
@@ -159,14 +159,13 @@ class RNN(Layer):
         self.num_layers = num_layers
         self.bias = bias
         self.batch_first = batch_first
-        self.dropout = dropout
 
-        self.cell_layers = [RNNCell(input_size, hidden_size, bias, nonlinearity)]
+        self.layers = [RNNCell(input_size, hidden_size, bias, nonlinearity)]
         
         for _ in range(num_layers - 1):
-            self.cell_layers.append(RNNCell(hidden_size, hidden_size, bias, nonlinearity))
+            self.layers.append(RNNCell(hidden_size, hidden_size, bias, nonlinearity))
 
-        self.dropout_layer = Dropout(dropout)
+        self.dropout = Dropout(dropout)
         
     def named_parameters(self):
         parameters: list[tuple[str, Tensor]] = []
@@ -194,10 +193,10 @@ class RNN(Layer):
             for layer in range(self.num_layers):
                 input = x[sequence] if layer == 0 else hidden[layer - 1]
                 
-                hidden[layer] = self.cell_layers[layer](input, hidden[layer])
+                hidden[layer] = self.layers[layer](input, hidden[layer])
 
                 if layer < self.num_layers - 1:
-                    hidden[layer] = self.dropout_layer(hidden[layer])
+                    hidden[layer] = self.dropout(hidden[layer])
                 
             outputs.append(hidden[-1])
 
@@ -208,3 +207,119 @@ class RNN(Layer):
             output = output.swapaxes(0, 1)
 
         return output, hn
+
+class LSTMCell(Layer):
+    def __init__(self, input_size: int, hidden_size: int, bias: bool = True):
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.bias = bias
+
+        stdv = 1 / hidden_size ** 0.5
+
+        self.weight_ih = mytorch.uniform(-stdv, stdv, (4 * hidden_size, input_size), mytorch.float32, True)
+        self.weight_hh = mytorch.uniform(-stdv, stdv, (4 * hidden_size, hidden_size), mytorch.float32, True)
+
+        if bias:
+            self.bias_ih = mytorch.uniform(-stdv, stdv, (4 * hidden_size, ), mytorch.float32, True)
+            self.bias_hh = mytorch.uniform(-stdv, stdv, (4 * hidden_size, ), mytorch.float32, True)
+        else:
+            self.bias_ih = None
+            self.bias_hh = None
+            
+    def named_parameters(self):
+        return [
+            ('weight_ih', self.weight_ih),
+            ('weight_hh', self.weight_hh),
+            ('bias_ih', self.bias_ih),
+            ('bias_hh', self.bias_hh)
+        ]
+        
+    def forward(self, x: Tensor, hx: Optional[tuple[Tensor, Tensor]] = None) -> tuple[Tensor, Tensor]:
+        if hx is None:
+            hx = (
+                mytorch.zeros((x.shape[0], self.hidden_size), mytorch.float32),
+                mytorch.zeros((x.shape[0], self.hidden_size), mytorch.float32)
+            )
+        
+        y = x @ self.weight_ih.T + hx[0] @ self.weight_hh.T
+        
+        if self.bias_ih and self.bias_hh:
+            y += self.bias_ih + self.bias_hh
+        
+        i = y[:, 0 * self.hidden_size : 1 * self.hidden_size].sigmoid()
+        f = y[:, 1 * self.hidden_size : 2 * self.hidden_size].sigmoid()
+        g = y[:, 2 * self.hidden_size : 3 * self.hidden_size].tanh()
+        o = y[:, 3 * self.hidden_size : 4 * self.hidden_size].sigmoid()
+        
+        c = f * hx[1] + i * g
+        h = o * c.tanh()
+        
+        return h, c
+    
+class LSTM(Layer):
+    def __init__(
+        self, 
+        input_size: int, 
+        hidden_size: int, 
+        num_layers = 1, 
+        bias: bool = True,
+        batch_first: bool = False,
+        dropout: float = 0.0,
+    ):
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.bias = bias
+        self.batch_first = batch_first
+
+        self.layers = [LSTMCell(input_size, hidden_size, bias)]
+        
+        for _ in range(num_layers - 1):
+            self.layers.append(LSTMCell(hidden_size, hidden_size, bias))
+
+        self.dropout = Dropout(dropout)
+        
+    def named_parameters(self):
+        parameters: list[tuple[str, Tensor]] = []
+
+        for i, cell in enumerate(self.cells):
+            for name, parameter in cell.named_parameters():
+                parameters.append((f'{name}_{i}', parameter))
+
+        return parameters
+    
+    def forward(self, x: Tensor, hx: Optional[tuple[Tensor, Tensor]] = None) -> tuple[Tensor, Tensor]:
+        if self.batch_first:
+            x = x.swapaxes(0, 1)
+        
+        sequence_size, batch_size = x.shape[:2]
+        
+        if hx is None:
+            hx = (
+                mytorch.zeros((self.num_layers, batch_size, self.hidden_size), mytorch.float32),
+                mytorch.zeros((self.num_layers, batch_size, self.hidden_size), mytorch.float32)
+            )
+            
+        hidden = [(hx[0][i], hx[1][i]) for i in range(self.num_layers)]
+        
+        outputs: list[tuple[Tensor, Tensor]] = []
+        
+        for sequence in range(sequence_size):
+            for layer in range(self.num_layers):
+                input = x[sequence] if layer == 0 else hidden[layer - 1][0]
+                
+                hidden[layer] = self.layers[layer](input, hidden[layer])
+
+                if layer < self.num_layers - 1:
+                    hidden[layer] = (self.dropout(hidden[layer][0]), self.dropout(hidden[layer][1]))
+                
+            outputs.append(hidden[-1])
+        
+        output = mytorch.stack([output[0] for output in outputs])
+        hn = mytorch.stack([item[0] for item in hidden])
+        cn = mytorch.stack([item[1] for item in hidden])
+        
+        if self.batch_first:
+            output = output.swapaxes(0, 1)
+        
+        return output, (hn, cn)

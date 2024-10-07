@@ -166,6 +166,17 @@ class Tensor:
 
         return Tensor(data, None, requires_grad, tanh_backward)
 
+    def sigmoid(self):
+        data = 1 / (1 + np.exp(-self.data))
+        requires_grad = self.requires_grad
+        sigmoid_backward = None
+        
+        if requires_grad:
+            def sigmoid_backward(grad: np.ndarray):
+                self.backward(grad * data * (1 - data))
+    
+        return Tensor(data, None, requires_grad, sigmoid_backward)
+    
     def sin(self):
         data = np.sin(self.data)
         requires_grad = self.requires_grad
