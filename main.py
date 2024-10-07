@@ -4,18 +4,24 @@ from mytorch import nn as nn2
 from torch import nn
 import torch
 
+INPUT_SIZE = 1 # OK
+HIDDEN_SIZE = 1 # OK 
+LAYERS = 5 #
+BATCHES = 2 # OK
+SEQUENCE_SIZE = 2 # OK
+
 # Entrada, Escondidos, Camadas
-rnn = nn.RNN(2, 3, 2, 'tanh', True, True, bidirectional=True)
+rnn = nn.RNN(INPUT_SIZE, HIDDEN_SIZE, LAYERS, 'tanh', True, False)
 
 # print([a for a in rnn._parameters])
 for a in rnn._parameters:
     print(a, '->', rnn._parameters[a].shape)
 
-# Momentos, Lotes, Entradas
-input = torch.randn(2, 2, 2)
+# Lotes, Momentos, Entradas
+input = torch.randn(SEQUENCE_SIZE, BATCHES, INPUT_SIZE)
 
 # Camadas, Lotes, Escondidos
-h0 = torch.randn(2 * 2, 2, 3, requires_grad=True)
+h0 = torch.randn(LAYERS, BATCHES, HIDDEN_SIZE, requires_grad=True)
 
 output, hn = rnn(input, h0)
 
@@ -23,34 +29,24 @@ print(output)
 
 output.backward(torch.ones_like(output))
 
-# print(h0.grad)
+print(h0.grad)
 
 print('-' * 50)
 
-rnn2 = nn2.RNN(2, 3, 2, 'tanh', True, True, bidirectional=True)
+rnn2 = nn2.RNN(INPUT_SIZE, HIDDEN_SIZE, LAYERS, 'tanh', True, False)
 
-rnn2.cells[0].weight_ih.data = rnn._parameters['weight_ih_l0'].detach().numpy()
-rnn2.cells[0].weight_hh.data = rnn._parameters['weight_hh_l0'].detach().numpy()
-rnn2.cells[0].bias_ih.data = rnn._parameters['bias_ih_l0'].detach().numpy()
-rnn2.cells[0].bias_hh.data = rnn._parameters['bias_hh_l0'].detach().numpy()
-rnn2.cells_reverse[0].weight_ih.data = rnn._parameters['weight_ih_l0_reverse'].detach().numpy()
-rnn2.cells_reverse[0].weight_hh.data = rnn._parameters['weight_hh_l0_reverse'].detach().numpy()
-rnn2.cells_reverse[0].bias_ih.data = rnn._parameters['bias_ih_l0_reverse'].detach().numpy()
-rnn2.cells_reverse[0].bias_hh.data = rnn._parameters['bias_hh_l0_reverse'].detach().numpy()
+for layer in range(LAYERS):
+    rnn2.cell_layers[layer].weight_ih.data = rnn._parameters[f'weight_ih_l{layer}'].detach().numpy()
+    rnn2.cell_layers[layer].weight_hh.data = rnn._parameters[f'weight_hh_l{layer}'].detach().numpy()
+    
+    if rnn.bias:
+        rnn2.cell_layers[layer].bias_ih.data = rnn._parameters[f'bias_ih_l{layer}'].detach().numpy()
+        rnn2.cell_layers[layer].bias_hh.data = rnn._parameters[f'bias_hh_l{layer}'].detach().numpy()
 
-rnn2.cells[1].weight_ih.data = rnn._parameters['weight_ih_l1'].detach().numpy()
-rnn2.cells[1].weight_hh.data = rnn._parameters['weight_hh_l1'].detach().numpy()
-rnn2.cells[1].bias_ih.data = rnn._parameters['bias_ih_l1'].detach().numpy()
-rnn2.cells[1].bias_hh.data = rnn._parameters['bias_hh_l1'].detach().numpy()
-rnn2.cells_reverse[1].weight_ih.data = rnn._parameters['weight_ih_l1_reverse'].detach().numpy()
-rnn2.cells_reverse[1].weight_hh.data = rnn._parameters['weight_hh_l1_reverse'].detach().numpy()
-rnn2.cells_reverse[1].bias_ih.data = rnn._parameters['bias_ih_l1_reverse'].detach().numpy()
-rnn2.cells_reverse[1].bias_hh.data = rnn._parameters['bias_hh_l1_reverse'].detach().numpy()
-
-input2 = mytorch.randn(2, 2, 2)
+input2 = mytorch.randn(SEQUENCE_SIZE, BATCHES, INPUT_SIZE)
 input2.data = input.detach().numpy()
 
-h02 = mytorch.randn(2 * 2, 2, 3, requires_grad=True)
+h02 = mytorch.randn(LAYERS, BATCHES, HIDDEN_SIZE, requires_grad=True)
 h02.data = h0.detach().numpy()
 
 output2, hn2 = rnn2(input2, h02)
@@ -59,4 +55,4 @@ print(output2)
 
 output2.backward()
 
-# print(h02.grad)
+print(h02.grad)

@@ -135,8 +135,7 @@ class Dropout(Layer):
 
     def forward(self, x: Tensor):
         if self.training:
-            mask = mytorch.binomial(
-                1, 1 - self.p, x.shape, mytorch.float32) * self.scale
+            mask = mytorch.binomial(1, 1 - self.p, x.shape, mytorch.float32) * self.scale
         else:
             mask = 1
 
@@ -153,31 +152,22 @@ class RNN(Layer):
         nonlinearity: Literal['tanh', 'relu'] = 'tanh',
         bias: bool = True,
         batch_first: bool = False,
-        dropout: float = 0,
-        bidirectional: bool = False  # Ignored
+        dropout: float = 0.0,
     ):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.bias = bias
-
         self.batch_first = batch_first
-        self.bidirectional = bidirectional
+        self.dropout = dropout
 
-        if dropout > 0:
-            self.dropout = Dropout(dropout)
-        else:
-            self.dropout = None
-
-        self.cells = [RNNCell(input_size, hidden_size, bias, nonlinearity)]
-        self.cells_reverse = [RNNCell(input_size, hidden_size, bias, nonlinearity)]
-
-        directions = 2 if bidirectional else 1
-
+        self.cell_layers = [RNNCell(input_size, hidden_size, bias, nonlinearity)]
+        
         for _ in range(num_layers - 1):
-            self.cells.append(RNNCell(hidden_size * directions, hidden_size, bias, nonlinearity))
-            self.cells_reverse.append(RNNCell(hidden_size * directions, hidden_size, bias, nonlinearity))
+            self.cell_layers.append(RNNCell(hidden_size, hidden_size, bias, nonlinearity))
 
+        self.dropout_layer = Dropout(dropout)
+        
     def named_parameters(self):
         parameters: list[tuple[str, Tensor]] = []
 
@@ -191,74 +181,30 @@ class RNN(Layer):
         if self.batch_first:
             x = x.swapaxes(0, 1)
         
-        sequence_size, batch_size, *_ = x.shape
+        sequence_size, batch_size = x.shape[:2]
 
         if hx is None:
-            directions = 2 if self.bidirectional else 1
-            
-            hx = mytorch.zeros((directions * self.num_layers, batch_size, self.hidden_size), mytorch.float32)
+            hx = mytorch.zeros((self.num_layers, batch_size, self.hidden_size), mytorch.float32)
 
-        if self.bidirectional:
-            hidden = [hx[i] for i in range(0, 2 * self.num_layers, 2)]
-            hidden_reverse = [hx[i] for i in range(1, 2 * self.num_layers, 2)]
-            
-            # hidden = [hx[i] for i in range(self.num_layers)]
-            # hidden_reverse = [hx[i] for i in range(self.num_layers, 2 * self.num_layers)]
-            
-        else:
-            hidden = [hx[i] for i in range(self.num_layers)]
-            hidden_reverse = None
+        hidden = [hx[i] for i in range(self.num_layers)]
 
         outputs: list[Tensor] = []
         
-        if self.bidirectional:  
-            outputs_reverse: list[Tensor] = []
-        else:
-            outputs_reverse = None
-
-        for i in range(sequence_size):
+        for sequence in range(sequence_size):
             for layer in range(self.num_layers):
-                if layer == 0:
-                    hidden[layer] = self.cells[layer](x[i], hidden[layer])
+                input = x[sequence] if layer == 0 else hidden[layer - 1]
+                
+                hidden[layer] = self.cell_layers[layer](input, hidden[layer])
 
-                    if self.bidirectional:
-                        hidden_reverse[layer] = self.cells_reverse[layer](x[-i - 1], hidden_reverse[layer])
-                else:
-                    prev = hidden[layer - 1].cat([hidden_reverse[layer - 1]], 1)
-                    
-                    hidden[layer] = self.cells[layer](prev, hidden[layer])
-                    
-                    if self.bidirectional:
-                        # prev = hidden_reverse[layer].cat([reverse[layer - 1]], 1)
-                        
-                        hidden_reverse[layer] = self.cells_reverse[layer](prev, hidden_reverse[layer])
-
-                # if layer < self.num_layers - 1 and self.dropout is not None:
-                #     hidden[layer] = self.dropout(hidden[layer])
-                    
-                #     if self.bidirectional:
-                #         hidden_reverse[layer] = self.dropout(hidden_reverse[layer])
-
+                if layer < self.num_layers - 1:
+                    hidden[layer] = self.dropout_layer(hidden[layer])
+                
             outputs.append(hidden[-1])
-            
-            if self.bidirectional:
-                outputs_reverse.append(hidden_reverse[-1])
 
         output = mytorch.stack(outputs)
-        h_n = mytorch.stack(hidden)
+        hn = mytorch.stack(hidden)
         
         if self.batch_first:
             output = output.swapaxes(0, 1)
 
-        if self.bidirectional:
-            output_reverse = mytorch.stack(outputs_reverse[::-1])
-            h_n_reverse = mytorch.stack(hidden_reverse)
-            
-            if self.batch_first:
-                output_reverse = output_reverse.swapaxes(0, 1)
-                
-            output = output.cat([output_reverse], 2)
-            h_n = h_n.cat([h_n_reverse], 2)
-        
-        
-        return output, h_n
+        return output, hn
