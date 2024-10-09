@@ -36,12 +36,12 @@ print('-' * 50)
 rnn2 = nn2.RNN(INPUT_SIZE, HIDDEN_SIZE, LAYERS, 'tanh', True, False)
 
 for layer in range(LAYERS):
-    rnn2.cell_layers[layer].weight_ih.data = rnn._parameters[f'weight_ih_l{layer}'].detach().numpy()
-    rnn2.cell_layers[layer].weight_hh.data = rnn._parameters[f'weight_hh_l{layer}'].detach().numpy()
+    rnn2.layers[layer].weight_ih.data = rnn._parameters[f'weight_ih_l{layer}'].detach().numpy()
+    rnn2.layers[layer].weight_hh.data = rnn._parameters[f'weight_hh_l{layer}'].detach().numpy()
     
     if rnn.bias:
-        rnn2.cell_layers[layer].bias_ih.data = rnn._parameters[f'bias_ih_l{layer}'].detach().numpy()
-        rnn2.cell_layers[layer].bias_hh.data = rnn._parameters[f'bias_hh_l{layer}'].detach().numpy()
+        rnn2.layers[layer].bias_ih.data = rnn._parameters[f'bias_ih_l{layer}'].detach().numpy()
+        rnn2.layers[layer].bias_hh.data = rnn._parameters[f'bias_hh_l{layer}'].detach().numpy()
 
 input2 = mytorch.randn(SEQUENCE_SIZE, BATCHES, INPUT_SIZE)
 input2.data = input.detach().numpy()
