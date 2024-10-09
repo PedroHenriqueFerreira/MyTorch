@@ -2,8 +2,6 @@ from abc import ABC, abstractmethod
 
 from mytorch.autograd import Tensor
 
-import numpy as np
-
 class Optimizer(ABC):
     ''' Base class for all optimizers. '''
     
@@ -39,8 +37,8 @@ class Adadelta(Optimizer):
         self.rho = rho
         self.eps = eps
         
-        self.v = [np.zeros(param.shape) for param in self.params]
-        self.u = [np.zeros(param.shape) for param in self.params]
+        self.v = [param.lib.zeros(param.shape) for param in self.params]
+        self.u = [param.lib.zeros(param.shape) for param in self.params]
         
     def step(self):
         for i, param in enumerate(self.params):
@@ -49,7 +47,7 @@ class Adadelta(Optimizer):
                 continue
             
             self.v[i] = self.rho * self.v[i] + (1 - self.rho) * param.grad ** 2
-            delta = np.sqrt(self.u[i] + self.eps) / np.sqrt(self.v[i] + self.eps) * param.grad
+            delta = param.lib.sqrt(self.u[i] + self.eps) / param.lib.sqrt(self.v[i] + self.eps) * param.grad
             self.u[i] = self.rho * self.u[i] + (1 - self.rho) * delta ** 2
             
             param.data -= self.lr * delta
@@ -69,7 +67,7 @@ class Adagrad(Optimizer):
         self.lr = lr
         self.eps = eps
         
-        self.v = [np.zeros(param.shape) for param in self.params]
+        self.v = [param.lib.zeros(param.shape) for param in self.params]
         
     def step(self):  
         for i, param in enumerate(self.params):
@@ -79,7 +77,7 @@ class Adagrad(Optimizer):
             
             self.v[i] += param.grad ** 2
             
-            param.data -= self.lr * param.grad / (np.sqrt(self.v[i]) + self.eps)
+            param.data -= self.lr * param.grad / (param.lib.sqrt(self.v[i]) + self.eps)
 
 class Adam(Optimizer):
     ''' Adaptive Moment Estimation optimizer. '''
@@ -98,8 +96,8 @@ class Adam(Optimizer):
         self.betas = betas
         self.eps = eps
         
-        self.m = [np.zeros(param.shape) for param in self.params]
-        self.v = [np.zeros(param.shape) for param in self.params]
+        self.m = [param.lib.zeros(param.shape) for param in self.params]
+        self.v = [param.lib.zeros(param.shape) for param in self.params]
         
         self.t = 0
         
@@ -117,7 +115,7 @@ class Adam(Optimizer):
             m_hat = self.m[i] / (1 - self.betas[0] ** self.t)
             v_hat = self.v[i] / (1 - self.betas[1] ** self.t)
             
-            param.data -= self.lr * m_hat / (np.sqrt(v_hat) + self.eps)
+            param.data -= self.lr * m_hat / (param.lib.sqrt(v_hat) + self.eps)
 
 class Adamax(Optimizer):
     ''' Adam with infinity norm. '''
@@ -136,8 +134,8 @@ class Adamax(Optimizer):
         self.betas = betas
         self.eps = eps
         
-        self.m = [np.zeros(param.shape) for param in self.params]
-        self.u = [np.zeros(param.shape) for param in self.params]
+        self.m = [param.lib.zeros(param.shape) for param in self.params]
+        self.u = [param.lib.zeros(param.shape) for param in self.params]
         
         self.t = 0
         
@@ -150,7 +148,7 @@ class Adamax(Optimizer):
                 continue
             
             self.m[i] = self.betas[0] * self.m[i] + (1 - self.betas[0]) * param.grad
-            self.u[i] = np.maximum(self.betas[1] * self.u[i], np.abs(param.grad))
+            self.u[i] = param.lib.maximum(self.betas[1] * self.u[i], param.lib.abs(param.grad))
             
             m_hat = self.m[i] / (1 - self.betas[0] ** self.t)
             
@@ -173,7 +171,7 @@ class RMSprop(Optimizer):
         self.alpha = alpha
         self.eps = eps
         
-        self.v = [np.zeros(param.shape) for param in self.params]
+        self.v = [param.lib.zeros(param.shape) for param in self.params]
     
     def step(self):
         for i, param in enumerate(self.params):
@@ -183,7 +181,7 @@ class RMSprop(Optimizer):
             
             self.v[i] = self.alpha * self.v[i] + (1 - self.alpha) * param.grad ** 2
             
-            param.data -= self.lr * param.grad / (np.sqrt(self.v[i]) + self.eps)
+            param.data -= self.lr * param.grad / (param.lib.sqrt(self.v[i]) + self.eps)
     
 class SGD(Optimizer):
     ''' Stochastic Gradient Descent optimizer. '''
@@ -202,7 +200,7 @@ class SGD(Optimizer):
         self.momentum = momentum
         self.nesterov = nesterov
         
-        self.m = [np.zeros(param.shape) for param in self.params]
+        self.m = [param.lib.zeros(param.shape) for param in self.params]
     
     def step(self):
         for i, param in enumerate(self.params):

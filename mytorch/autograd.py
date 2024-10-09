@@ -7,16 +7,12 @@ import cupy as cp
 np.seterr(all='ignore')
 
 NDArray = Union[np.ndarray, cp.ndarray]
-
 Tensorable = Union['Tensor', ArrayLike]
-
-def ensure_tensor(input: Tensorable):
-    return input if isinstance(input, Tensor) else Tensor(input)
 
 class Tensor:
     def __init__(
         self,
-        data: ArrayLike,
+        data: Tensorable,
         dtype: DTypeLike = None,
         requires_grad = False,
         grad_fn: Optional[Callable[[NDArray], None]] = None,
@@ -30,7 +26,11 @@ class Tensor:
             case _:
                 raise ValueError('Invalid device')
         
-        self.data = self.lib.array(data, dtype=dtype)
+        if isinstance(data, Tensor):
+            self.data: NDArray = self.lib.array(data.data, dtype=dtype)
+        else:
+            self.data: NDArray = self.lib.array(data, dtype=dtype)
+        
         self.requires_grad = requires_grad
         self.grad_fn = grad_fn
         self.device = device
@@ -45,10 +45,19 @@ class Tensor:
         else:
             return f'tensor({self.data.round(4)}, dtype={self.dtype}, device={self.device})'
     
+    def ensure_tensor(self, other: Tensorable):
+        if isinstance(other, Tensor):
+            if self.device != other.device:
+                raise ValueError('Tensors must be in the same device')
+            
+            return other
+        
+        return Tensor(other, dtype=self.dtype, device=self.device)
+    
     # Utils methods
 
     def detach(self):
-        return Tensor(self.data, dtype=self.dtype, requires_grad=False, device=self.device)
+        return Tensor(self.data, dtype=self.dtype, device=self.device)
 
     def numpy(self):
         if self.device == 'cuda':
@@ -60,6 +69,9 @@ class Tensor:
         return self.data
     
     def to(self, device: Literal['cpu', 'cuda']):
+        if device not in ('cpu', 'cuda'):
+            raise ValueError('Invalid device')
+        
         data = self.data if self.device == 'cpu' else self.data.get()
             
         return Tensor(data, dtype=self.dtype, requires_grad=self.requires_grad, device=device)
@@ -76,32 +88,32 @@ class Tensor:
         return Tensor(~self.data, dtype=self.dtype, device=self.device)
 
     def greater(self, other: Tensorable):
-        other_t = ensure_tensor(other)    
+        other_t = self.ensure_tensor(other)    
     
         return Tensor(self.data > other_t.data, dtype=self.dtype, device=self.device)
     
     def greater_equal(self, other: Tensorable):
-        other_t = ensure_tensor(other)
+        other_t = self.ensure_tensor(other)
         
         return Tensor(self.data >= other_t.data, dtype=self.dtype, device=self.device)
     
     def less(self, other: Tensorable):
-        other_t = ensure_tensor(other)
+        other_t = self.ensure_tensor(other)
         
         return Tensor(self.data < other_t.data, dtype=self.dtype, device=self.device)
     
     def less_equal(self, other: Tensorable):
-        other_t = ensure_tensor(other)
+        other_t = self.ensure_tensor(other)
         
         return Tensor(self.data <= other_t.data, dtype=self.dtype, device=self.device)
     
     def equal(self, other: Tensorable):
-        other_t = ensure_tensor(other)
+        other_t = self.ensure_tensor(other)
         
         return Tensor(self.data == other_t.data, dtype=self.dtype, device=self.device)
     
     def not_equal(self, other: Tensorable):
-        other_t = ensure_tensor(other)
+        other_t = self.ensure_tensor(other)
         
         return Tensor(self.data != other_t.data, dtype=self.dtype, device=self.device)
 
@@ -229,7 +241,7 @@ class Tensor:
     # Binary operations
 
     def add(self, other: Tensorable):
-        other_t = ensure_tensor(other)
+        other_t = self.ensure_tensor(other)
 
         data = self.data + other_t.data
         requires_grad = self.requires_grad or other_t.requires_grad
@@ -246,7 +258,7 @@ class Tensor:
         return Tensor(data, self.dtype, requires_grad, add_backward, self.device)
 
     def sub(self, other: Tensorable):
-        other_t = ensure_tensor(other)
+        other_t = self.ensure_tensor(other)
 
         data = self.data - other_t.data
         requires_grad = self.requires_grad or other_t.requires_grad
@@ -263,7 +275,7 @@ class Tensor:
         return Tensor(data, self.dtype, requires_grad, sub_backward, self.device)
 
     def mul(self, other: Tensorable):
-        other_t = ensure_tensor(other)
+        other_t = self.ensure_tensor(other)
 
         data = self.data * other_t.data
         requires_grad = self.requires_grad or other_t.requires_grad
@@ -280,7 +292,7 @@ class Tensor:
         return Tensor(data, self.dtype, requires_grad, mul_backward, self.device)
 
     def div(self, other: Tensorable):
-        other_t = ensure_tensor(other)
+        other_t = self.ensure_tensor(other)
 
         data = self.data / other_t.data
         requires_grad = self.requires_grad or other_t.requires_grad
@@ -297,7 +309,7 @@ class Tensor:
         return Tensor(data, self.dtype, requires_grad, div_backward, self.device)
 
     def matmul(self, other: Tensorable):
-        other_t = ensure_tensor(other)
+        other_t = self.ensure_tensor(other)
         
         data = self.data @ other_t.data
         requires_grad = self.requires_grad or other_t.requires_grad
@@ -330,7 +342,7 @@ class Tensor:
         return Tensor(data, self.dtype, requires_grad, matmul_backward, self.device)
 
     def outer(self, other: Tensorable):
-        other_t = ensure_tensor(other)
+        other_t = self.ensure_tensor(other)
 
         data = self.lib.outer(self.data, other_t.data)
         requires_grad = self.requires_grad or other_t.requires_grad
@@ -347,7 +359,7 @@ class Tensor:
         return Tensor(data, self.dtype, requires_grad, outer_backward, self.device)
 
     def pow(self, other: Tensorable):
-        other_t = ensure_tensor(other)
+        other_t = self.ensure_tensor(other)
 
         data = self.data ** other_t.data
         requires_grad = self.requires_grad or other_t.requires_grad
@@ -364,7 +376,7 @@ class Tensor:
         return Tensor(data, self.dtype, requires_grad, pow_backward, self.device)
 
     def maximum(self, other: Tensorable):
-        other_t = ensure_tensor(other)
+        other_t = self.ensure_tensor(other)
 
         data = self.lib.maximum(self.data, other_t.data)
         requires_grad = self.requires_grad or other_t.requires_grad
@@ -383,7 +395,7 @@ class Tensor:
         return Tensor(data, self.dtype, requires_grad, maximum_backward, self.device)
 
     def minimum(self, other: Tensorable):
-        other_t = ensure_tensor(other)
+        other_t = self.ensure_tensor(other)
 
         data = self.lib.minimum(self.data, other_t.data)
         requires_grad = self.requires_grad or other_t.requires_grad
@@ -558,7 +570,7 @@ class Tensor:
     # Other operations
 
     def stack(self, arrays: Sequence[Tensorable], dim: SupportsIndex = 0):
-        tensors = [self] + [ensure_tensor(item) for item in arrays]
+        tensors = [self] + [self.ensure_tensor(item) for item in arrays]
         
         data = self.lib.stack([t.data for t in tensors], axis=dim)
         requires_grad = any(t.requires_grad for t in tensors)
@@ -577,7 +589,7 @@ class Tensor:
         return Tensor(data, self.dtype, requires_grad, stack_backward, self.device)
 
     def cat(self, arrays: Sequence[Tensorable], dim: SupportsIndex = 0):
-        tensors = [self] + [ensure_tensor(item) for item in arrays]
+        tensors = [self] + [self.ensure_tensor(item) for item in arrays]
 
         data = self.lib.concatenate([t.data for t in tensors], axis=dim)
         requires_grad = any(t.requires_grad for t in tensors)
@@ -599,8 +611,8 @@ class Tensor:
         return Tensor(data, self.dtype, requires_grad, cat_backward, self.device)
     
     def where(self, condition: Tensorable, other: Tensorable):
-        condition_t = ensure_tensor(condition)
-        other_t = ensure_tensor(other)
+        condition_t = self.ensure_tensor(condition)
+        other_t = self.ensure_tensor(other)
         
         data = self.lib.where(condition_t.data, self.data, other_t.data)
         requires_grad = self.requires_grad or other_t.requires_grad
@@ -669,37 +681,37 @@ class Tensor:
         return self.add(other)
 
     def __radd__(self, other: Tensorable):
-        return ensure_tensor(other).add(self)
+        return self.ensure_tensor(other).add(self)
 
     def __sub__(self, other: Tensorable):
         return self.sub(other)
 
     def __rsub__(self, other: Tensorable):
-        return ensure_tensor(other).sub(self)
+        return self.ensure_tensor(other).sub(self)
 
     def __mul__(self, other: Tensorable):
         return self.mul(other)
 
     def __rmul__(self, other: Tensorable):
-        return ensure_tensor(other).mul(self)
+        return self.ensure_tensor(other).mul(self)
 
     def __truediv__(self, other: Tensorable):
         return self.div(other)
 
     def __rtruediv__(self, other: Tensorable):
-        return ensure_tensor(other).div(self)
+        return self.ensure_tensor(other).div(self)
 
     def __matmul__(self, other: Tensorable):
         return self.matmul(other)
 
     def __rmatmul__(self, other: Tensorable):
-        return ensure_tensor(other).matmul(self)
+        return self.ensure_tensor(other).matmul(self)
 
     def __pow__(self, other: Tensorable):
         return self.pow(other)
 
     def __rpow__(self, other: Tensorable):
-        return ensure_tensor(other).pow(self)
+        return self.ensure_tensor(other).pow(self)
 
     def __getitem__(self, key):
         return self.getitem(key)
@@ -745,7 +757,7 @@ class Tensor:
             grad = self.lib.ones(self.shape, dtype=self.dtype)
         else:
             grad = self.lib.array(grad, dtype=self.dtype)
-
+        
         # Sum gradient to match data shape
         if self.shape != grad.shape:
             keepdims = self.ndim == grad.ndim
@@ -768,6 +780,7 @@ class Tensor:
             # Accumulate gradient
             self.grad += grad
 
+        # Backpropagate gradient
         if grad is not None and self.grad_fn is not None:
             self.grad_fn(grad)
 
@@ -869,6 +882,9 @@ def exp(input: Tensor):
 
 def tanh(input: Tensor):
     return input.tanh()
+
+def sigmoid(input: Tensor):
+    return input.sigmoid()
 
 def sin(input: Tensor):
     return input.sin()
