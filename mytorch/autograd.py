@@ -6,17 +6,20 @@ import cupy as cp
 
 np.seterr(all='ignore')
 
+ShapeLike = _ShapeLike
+
 NDArray = Union[np.ndarray, cp.ndarray]
-Tensorable = Union['Tensor', ArrayLike]
+TensorLikeType = Union['Tensor', ArrayLike]
+DeviceLikeType = Literal['cpu', 'cuda']
 
 class Tensor:
     def __init__(
         self,
-        data: Tensorable,
+        data: TensorLikeType,
         dtype: DTypeLike = None,
         requires_grad = False,
         grad_fn: Optional[Callable[[NDArray], None]] = None,
-        device: Literal['cpu', 'cuda'] = 'cpu'
+        device: DeviceLikeType  = 'cpu'
     ):
         match device:
             case 'cpu':
@@ -39,13 +42,13 @@ class Tensor:
 
     def __repr__(self):
         if self.grad_fn:
-            return f'tensor({self.data.round(4)}, dtype={self.dtype}, grad_fn=<{self.grad_fn.__name__}>, device={self.device})'
+            return f'tensor({self.data.round(4)}, dtype={self.dtype}, grad_fn=<{self.grad_fn.__name__}>, device="{self.device}")'
         elif self.requires_grad:
-            return f'tensor({self.data.round(4)}, dtype={self.dtype}, requires_grad=True, device={self.device})'
+            return f'tensor({self.data.round(4)}, dtype={self.dtype}, requires_grad=True, device="{self.device}")'
         else:
-            return f'tensor({self.data.round(4)}, dtype={self.dtype}, device={self.device})'
+            return f'tensor({self.data.round(4)}, dtype={self.dtype}, device="{self.device}")'
     
-    def ensure_tensor(self, other: Tensorable):
+    def ensure_tensor(self, other: TensorLikeType):
         if isinstance(other, Tensor):
             if self.device != other.device:
                 raise ValueError('Tensors must be in the same device')
@@ -68,7 +71,7 @@ class Tensor:
         
         return self.data
     
-    def to(self, device: Literal['cpu', 'cuda']):
+    def to(self, device: DeviceLikeType):
         if device not in ('cpu', 'cuda'):
             raise ValueError('Invalid device')
         
@@ -87,36 +90,48 @@ class Tensor:
     def invert(self):
         return Tensor(~self.data, dtype=self.dtype, device=self.device)
 
-    def greater(self, other: Tensorable):
+    def greater(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)    
     
         return Tensor(self.data > other_t.data, dtype=self.dtype, device=self.device)
     
-    def greater_equal(self, other: Tensorable):
+    def greater_equal(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)
         
         return Tensor(self.data >= other_t.data, dtype=self.dtype, device=self.device)
     
-    def less(self, other: Tensorable):
+    def less(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)
         
         return Tensor(self.data < other_t.data, dtype=self.dtype, device=self.device)
     
-    def less_equal(self, other: Tensorable):
+    def less_equal(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)
         
         return Tensor(self.data <= other_t.data, dtype=self.dtype, device=self.device)
     
-    def equal(self, other: Tensorable):
+    def equal(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)
         
         return Tensor(self.data == other_t.data, dtype=self.dtype, device=self.device)
     
-    def not_equal(self, other: Tensorable):
+    def not_equal(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)
         
         return Tensor(self.data != other_t.data, dtype=self.dtype, device=self.device)
 
+    # Indices operations (non gradient)
+    
+    def argmin(self, dim: SupportsIndex = 0, keepdim: bool = False):
+        data = self.data.argmin(axis=dim, keepdims=keepdim)
+        
+        return Tensor(data, dtype=self.lib.int32, device=self.device)
+
+    def argmax(self, dim: SupportsIndex = 0, keepdim: bool = False):
+        data = self.data.argmax(axis=dim, keepdims=keepdim)
+        
+        return Tensor(data, dtype=self.lib.int32, device=self.device)
+    
     # Single operations
     
     def sign(self):
@@ -240,7 +255,7 @@ class Tensor:
 
     # Binary operations
 
-    def add(self, other: Tensorable):
+    def add(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)
 
         data = self.data + other_t.data
@@ -257,7 +272,7 @@ class Tensor:
 
         return Tensor(data, self.dtype, requires_grad, add_backward, self.device)
 
-    def sub(self, other: Tensorable):
+    def sub(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)
 
         data = self.data - other_t.data
@@ -274,7 +289,7 @@ class Tensor:
 
         return Tensor(data, self.dtype, requires_grad, sub_backward, self.device)
 
-    def mul(self, other: Tensorable):
+    def mul(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)
 
         data = self.data * other_t.data
@@ -291,7 +306,7 @@ class Tensor:
 
         return Tensor(data, self.dtype, requires_grad, mul_backward, self.device)
 
-    def div(self, other: Tensorable):
+    def div(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)
 
         data = self.data / other_t.data
@@ -308,7 +323,7 @@ class Tensor:
 
         return Tensor(data, self.dtype, requires_grad, div_backward, self.device)
 
-    def matmul(self, other: Tensorable):
+    def matmul(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)
         
         data = self.data @ other_t.data
@@ -341,7 +356,7 @@ class Tensor:
 
         return Tensor(data, self.dtype, requires_grad, matmul_backward, self.device)
 
-    def outer(self, other: Tensorable):
+    def outer(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)
 
         data = self.lib.outer(self.data, other_t.data)
@@ -358,7 +373,7 @@ class Tensor:
                 
         return Tensor(data, self.dtype, requires_grad, outer_backward, self.device)
 
-    def pow(self, other: Tensorable):
+    def pow(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)
 
         data = self.data ** other_t.data
@@ -375,7 +390,7 @@ class Tensor:
 
         return Tensor(data, self.dtype, requires_grad, pow_backward, self.device)
 
-    def maximum(self, other: Tensorable):
+    def maximum(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)
 
         data = self.lib.maximum(self.data, other_t.data)
@@ -394,7 +409,7 @@ class Tensor:
 
         return Tensor(data, self.dtype, requires_grad, maximum_backward, self.device)
 
-    def minimum(self, other: Tensorable):
+    def minimum(self, other: TensorLikeType):
         other_t = self.ensure_tensor(other)
 
         data = self.lib.minimum(self.data, other_t.data)
@@ -415,7 +430,7 @@ class Tensor:
 
     # Batch operations
 
-    def sum(self, dim: Optional[_ShapeLike] = None, keepdim: bool = False):
+    def sum(self, dim: Optional[ShapeLike] = None, keepdim: bool = False):
         data = self.data.sum(axis=dim, keepdims=keepdim)
         sum_backward = None
 
@@ -429,7 +444,7 @@ class Tensor:
 
         return Tensor(data, self.dtype, self.requires_grad, sum_backward, self.device)
 
-    def mean(self, dim: Optional[_ShapeLike] = None, keepdim: bool = False):
+    def mean(self, dim: Optional[ShapeLike] = None, keepdim: bool = False):
         data = self.data.mean(axis=dim, keepdims=keepdim)
         mean_backward = None
 
@@ -447,7 +462,7 @@ class Tensor:
 
         return Tensor(data, self.dtype, self.requires_grad, mean_backward, self.device)
 
-    def var(self, dim: Optional[_ShapeLike] = None, correction: int = 1, keepdim: bool = False):
+    def var(self, dim: Optional[ShapeLike] = None, correction: int = 1, keepdim: bool = False):
         data = self.data.var(axis=dim, keepdims=keepdim, ddof=correction)
         var_backward = None
 
@@ -468,7 +483,7 @@ class Tensor:
                 
         return Tensor(data, self.dtype, self.requires_grad, var_backward, self.device)
 
-    def max(self, dim: Optional[_ShapeLike] = None, keepdim: bool = False):
+    def max(self, dim: Optional[ShapeLike] = None, keepdim: bool = False):
         data = self.data.max(axis=dim, keepdims=keepdim)
         max_backward = None
 
@@ -485,7 +500,7 @@ class Tensor:
 
         return Tensor(data, self.dtype, self.requires_grad, max_backward, self.device)
 
-    def min(self, dim: Optional[_ShapeLike] = None, keepdim: bool = False):
+    def min(self, dim: Optional[ShapeLike] = None, keepdim: bool = False):
         data = self.data.min(axis=dim, keepdims=keepdim)
         min_backward = None
 
@@ -504,7 +519,7 @@ class Tensor:
 
     # Shape operations
 
-    def reshape(self, shape: _ShapeLike):
+    def reshape(self, shape: ShapeLike):
         data = self.data.reshape(shape)
         reshape_backward = None
 
@@ -514,7 +529,7 @@ class Tensor:
 
         return Tensor(data, self.dtype, self.requires_grad, reshape_backward, self.device)
 
-    def transpose(self, axes: Optional[_ShapeLike] = None):
+    def transpose(self, axes: Optional[ShapeLike] = None):
         data = self.data.transpose(axes)
         transpose_backward = None
         
@@ -534,7 +549,7 @@ class Tensor:
 
         return Tensor(data, self.dtype, self.requires_grad, swapaxes_backward, self.device)
 
-    def flip(self, dims: Optional[_ShapeLike] = None):
+    def flip(self, dims: Optional[ShapeLike] = None):
         data = self.lib.flip(self.data, axis=dims)
         flip_backward = None
         
@@ -544,7 +559,7 @@ class Tensor:
                 
         return Tensor(data, self.dtype, self.requires_grad, flip_backward, self.device)
     
-    def unsqueeze(self, dim: _ShapeLike):
+    def unsqueeze(self, dim: ShapeLike):
         data = self.lib.expand_dims(self.data, dim)
         unsqueeze_backward = None
         
@@ -554,7 +569,7 @@ class Tensor:
                 
         return Tensor(data, self.dtype, self.requires_grad, unsqueeze_backward, self.device)
 
-    def squeeze(self, dim: Optional[_ShapeLike] = None):
+    def squeeze(self, dim: Optional[ShapeLike] = None):
         data = self.lib.squeeze(self.data, dim)
         squeeze_backward = None
         
@@ -569,7 +584,7 @@ class Tensor:
     
     # Other operations
 
-    def stack(self, arrays: Sequence[Tensorable], dim: SupportsIndex = 0):
+    def stack(self, arrays: Sequence[TensorLikeType], dim: SupportsIndex = 0):
         tensors = [self] + [self.ensure_tensor(item) for item in arrays]
         
         data = self.lib.stack([t.data for t in tensors], axis=dim)
@@ -588,7 +603,7 @@ class Tensor:
 
         return Tensor(data, self.dtype, requires_grad, stack_backward, self.device)
 
-    def cat(self, arrays: Sequence[Tensorable], dim: SupportsIndex = 0):
+    def cat(self, arrays: Sequence[TensorLikeType], dim: SupportsIndex = 0):
         tensors = [self] + [self.ensure_tensor(item) for item in arrays]
 
         data = self.lib.concatenate([t.data for t in tensors], axis=dim)
@@ -610,7 +625,7 @@ class Tensor:
 
         return Tensor(data, self.dtype, requires_grad, cat_backward, self.device)
     
-    def where(self, condition: Tensorable, other: Tensorable):
+    def where(self, condition: TensorLikeType, other: TensorLikeType):
         condition_t = self.ensure_tensor(condition)
         other_t = self.ensure_tensor(other)
         
@@ -650,16 +665,16 @@ class Tensor:
     def __invert__(self):
         return self.invert()
 
-    def __gt__(self, other: Tensorable):
+    def __gt__(self, other: TensorLikeType):
         return self.greater(other)
     
-    def __ge__(self, other: Tensorable):
+    def __ge__(self, other: TensorLikeType):
         return self.greater_equal(other)
     
-    def __lt__(self, other: Tensorable):
+    def __lt__(self, other: TensorLikeType):
         return self.less(other)
     
-    def __le__(self, other: Tensorable):
+    def __le__(self, other: TensorLikeType):
         return self.less_equal(other)
     
     def __eq__(self, other):
@@ -677,40 +692,40 @@ class Tensor:
     def __neg__(self):
         return self.negative()
 
-    def __add__(self, other: Tensorable):
+    def __add__(self, other: TensorLikeType):
         return self.add(other)
 
-    def __radd__(self, other: Tensorable):
+    def __radd__(self, other: TensorLikeType):
         return self.ensure_tensor(other).add(self)
 
-    def __sub__(self, other: Tensorable):
+    def __sub__(self, other: TensorLikeType):
         return self.sub(other)
 
-    def __rsub__(self, other: Tensorable):
+    def __rsub__(self, other: TensorLikeType):
         return self.ensure_tensor(other).sub(self)
 
-    def __mul__(self, other: Tensorable):
+    def __mul__(self, other: TensorLikeType):
         return self.mul(other)
 
-    def __rmul__(self, other: Tensorable):
+    def __rmul__(self, other: TensorLikeType):
         return self.ensure_tensor(other).mul(self)
 
-    def __truediv__(self, other: Tensorable):
+    def __truediv__(self, other: TensorLikeType):
         return self.div(other)
 
-    def __rtruediv__(self, other: Tensorable):
+    def __rtruediv__(self, other: TensorLikeType):
         return self.ensure_tensor(other).div(self)
 
-    def __matmul__(self, other: Tensorable):
+    def __matmul__(self, other: TensorLikeType):
         return self.matmul(other)
 
-    def __rmatmul__(self, other: Tensorable):
+    def __rmatmul__(self, other: TensorLikeType):
         return self.ensure_tensor(other).matmul(self)
 
-    def __pow__(self, other: Tensorable):
+    def __pow__(self, other: TensorLikeType):
         return self.pow(other)
 
-    def __rpow__(self, other: Tensorable):
+    def __rpow__(self, other: TensorLikeType):
         return self.ensure_tensor(other).pow(self)
 
     def __getitem__(self, key):
@@ -783,188 +798,3 @@ class Tensor:
         # Backpropagate gradient
         if grad is not None and self.grad_fn is not None:
             self.grad_fn(grad)
-
-# Data Types
-
-int8 = np.int8
-int16 = np.int16
-int32 = np.int32
-int64 = np.int64
-float16 = np.float16
-float32 = np.float32
-float64 = np.float64
-
-# Factory methods
-
-def tensor(data: ArrayLike, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(data, dtype=dtype, requires_grad=requires_grad)
-
-def ones(shape: _ShapeLike, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.ones(shape), dtype=dtype, requires_grad=requires_grad)
-
-def ones_like(tensor: Tensor, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.ones_like(tensor.data), dtype=dtype, requires_grad=requires_grad)
-
-def zeros(shape: _ShapeLike, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.zeros(shape), dtype=dtype, requires_grad=requires_grad)
-
-def zeros_like(tensor: Tensor, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.zeros_like(tensor.data), dtype=dtype, requires_grad=requires_grad)
-
-def rand(*shape: int, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.random.rand(*shape), dtype=dtype, requires_grad=requires_grad)
-
-def randn(*shape: int, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.random.randn(*shape), dtype=dtype, requires_grad=requires_grad)
-
-def binomial(n: int, p: float, shape: Optional[_ShapeLike] = None, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.random.binomial(n, p, shape), dtype=dtype, requires_grad=requires_grad)
-
-def uniform(low: float, high: float, shape: Optional[_ShapeLike] = None, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.random.uniform(low, high, shape), dtype=dtype, requires_grad=requires_grad)
-
-def arange(start = 0, stop = 0, step = 1, dtype: DTypeLike = None, requires_grad = False):
-    return Tensor(np.arange(start, stop, step), dtype=dtype, requires_grad=requires_grad)
-
-def indices(shape: Sequence[int], sparse = False, dtype: DTypeLike = None, requires_grad = False):
-    data = np.indices(shape, sparse=sparse)
-    
-    if sparse:
-        return [Tensor(item, dtype=dtype, requires_grad=requires_grad) for item in data]
-    else:
-        return Tensor(data, dtype=dtype, requires_grad=requires_grad)
-
-# Non gradient operations
-
-def invert(input: Tensor):
-    return input.invert()
-
-def greater(input: Tensor, other: Tensor):
-    return input.greater(other)
-
-def greater_equal(input: Tensor, other: Tensor):
-    return input.greater_equal(other)
-
-def less(input: Tensor, other: Tensor):
-    return input.less(other)
-
-def less_equal(input: Tensor, other: Tensor):
-    return input.less_equal(other)
-
-def equal(input: Tensor, other: Tensor):
-    return input.equal(other)
-
-def not_equal(input: Tensor, other: Tensor):
-    return input.not_equal(other)
-
-# Single operations
-
-def sign(input: Tensor):
-    return input.sign()
-
-def abs(input: Tensor):
-    return input.abs()
-
-def positive(input: Tensor):
-    return input.positive()
-
-def negative(input: Tensor):
-    return input.negative()
-
-def sqrt(input: Tensor):
-    return input.sqrt()
-
-def log(input: Tensor, safe: bool = False):
-    return input.log(safe)
-
-def exp(input: Tensor):
-    return input.exp()
-
-def tanh(input: Tensor):
-    return input.tanh()
-
-def sigmoid(input: Tensor):
-    return input.sigmoid()
-
-def sin(input: Tensor):
-    return input.sin()
-
-def cos(input: Tensor):
-    return input.cos()
-
-# Binary operations
-
-def add(input: Tensor, other: Tensor):
-    return input.add(other)
-
-def sub(input: Tensor, other: Tensor):
-    return input.sub(other)
-
-def mul(input: Tensor, other: Tensor):
-    return input.mul(other)
-
-def div(input: Tensor, other: Tensor):
-    return input.div(other)
-
-def matmul(input: Tensor, other: Tensor):
-    return input.matmul(other)
-
-def outer(input: Tensor, other: Tensor):
-    return input.outer(other)
-
-def pow(input: Tensor, other: Tensor):
-    return input.pow(other)
-
-def maximum(input: Tensor, other: Tensor):
-    return input.maximum(other)
-
-def minimum(input: Tensor, other: Tensor):
-    return input.minimum(other)
-
-# Batch operations
-
-def sum(input: Tensor, dim: Optional[_ShapeLike] = None, keepdim: bool = False):
-    return input.sum(dim=dim, keepdim=keepdim)
-
-def mean(input: Tensor, dim: Optional[_ShapeLike] = None, keepdim: bool = False):
-    return input.mean(dim=dim, keepdim=keepdim)
-
-def var(input: Tensor, dim: Optional[_ShapeLike] = None, correction: int = 1, keepdim: bool = False):
-    return input.var(dim=dim, correction=correction, keepdim=keepdim)
-
-def max(input: Tensor, dim: Optional[_ShapeLike] = None, keepdim: bool = False):
-    return input.max(dim=dim, keepdim=keepdim)
-
-def min(input: Tensor, dim: Optional[_ShapeLike] = None, keepdim: bool = False):
-    return input.min(dim=dim, keepdim=keepdim)
-
-# Shape operations
-
-def reshape(input: Tensor, shape: _ShapeLike):
-    return input.reshape(shape)
-
-def transpose(input: Tensor, axes: Optional[_ShapeLike] = None):
-    return input.transpose(axes)
-
-def swapaxes(input: Tensor, axis1: SupportsIndex, axis2: SupportsIndex):
-    return input.swapaxes(axis1, axis2)
-
-def flip(input: Tensor, dims: Optional[_ShapeLike] = None):
-    return input.flip(dims=dims)
-
-def unsqueeze(input: Tensor, dim: _ShapeLike):
-    return input.unsqueeze(dim)
-
-def squeeze(input: Tensor, dim: Optional[_ShapeLike] = None):
-    return input.squeeze(dim=dim)
-
-# Other operations
-
-def stack(arrays: Sequence[Tensor], dim: SupportsIndex = 0):
-    return arrays[0].stack(arrays[1:], dim=dim)
-
-def cat(arrays: Sequence[Tensor], dim: SupportsIndex = 0):
-    return arrays[0].cat(arrays[1:], dim=dim)
-
-def where(condition: Tensor, input: Tensor, other: Tensor):
-    return input.where(condition, other)

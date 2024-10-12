@@ -1,54 +1,14 @@
-from abc import ABC, abstractmethod
 from typing import Literal, Optional
 
 import mytorch
-from mytorch import Tensor
+from mytorch import Tensor, DeviceLikeType
 from mytorch.nn import ReLU, Tanh
+from mytorch.nn.modules import Module
 
-
-class Layer(ABC):
-    ''' Abstract class for layers. '''
-
-    @abstractmethod
-    def named_parameters(self) -> list[tuple[str, Tensor]]:
-        ''' Returns the parameters of the layer. '''
-
-        pass
-
-    @abstractmethod
-    def forward(self, x: Tensor, *args) -> Tensor:
-        ''' Forward pass. '''
-
-        pass
-
-    def __call__(self, x: Tensor, *args) -> Tensor:
-        return self.forward(x, *args)
-
-    def eval(self):
-        ''' Sets the layer to evaluation mode. '''
-
-        if hasattr(self, 'training'):
-            self.training = False
-
-        for item in self.__dict__.values():
-            if isinstance(item, Layer):
-                item.eval()
-
-    def train(self, mode: bool = True):
-        ''' Sets the layer to training mode. '''
-
-        if hasattr(self, 'training'):
-            self.training = mode
-
-        for item in self.__dict__.values():
-            if isinstance(item, Layer):
-                item.train(mode)
-
-
-class Linear(Layer):
+class Linear(Module):
     ''' Linear layer. '''
 
-    def __init__(self, in_features: int, out_features: int, bias: bool = True):
+    def __init__(self, in_features: int, out_features: int, bias: bool = True, device: DeviceLikeType = 'cpu'):
         self.in_features = in_features
         self.out_features = out_features
 
@@ -60,11 +20,13 @@ class Linear(Layer):
             self.bias = mytorch.uniform(-stdv, stdv, (1, out_features), mytorch.float32, True)
         else:
             self.bias = None
-
-    def named_parameters(self):
-        return [('weight', self.weight), ('bias', self.bias)]
+            
+        self.to(device)
 
     def forward(self, x: Tensor) -> Tensor:
+        if self.device != x.device:
+            raise ValueError('Tensors must be on the same device')
+        
         y = x @ self.weight.T
 
         if self.bias is not None:
@@ -72,7 +34,7 @@ class Linear(Layer):
 
         return y
 
-class RNNCell(Layer):
+class RNNCell(Module):
     ''' Elman RNN cell '''
 
     def __init__(
@@ -80,7 +42,8 @@ class RNNCell(Layer):
         input_size: int, 
         hidden_size: int, 
         bias: bool = True, 
-        nonlinearity: Literal['tanh', 'relu'] = 'tanh'
+        nonlinearity: Literal['tanh', 'relu'] = 'tanh',
+        device: DeviceLikeType = 'cpu'
     ):
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -98,16 +61,16 @@ class RNNCell(Layer):
         else:
             self.bias_ih = None
             self.bias_hh = None
-
-    def named_parameters(self):
-        return [
-            ('weight_ih', self.weight_ih),
-            ('weight_hh', self.weight_hh),
-            ('bias_ih', self.bias_ih),
-            ('bias_hh', self.bias_hh)
-        ]
+            
+        self.to(device)
 
     def forward(self, x: Tensor, hx: Optional[Tensor] = None) -> Tensor:
+        if self.device != x.device:
+            raise ValueError('Tensors must be on the same device')
+        
+        if hx is not None and self.device != hx.device:
+            raise ValueError('Tensors must be on the same device')
+        
         if hx is None:
             hx = mytorch.zeros((x.shape[0], self.hidden_size), mytorch.float32)
         
@@ -121,27 +84,31 @@ class RNNCell(Layer):
 
         return self.nonlinearity(y)
 
-class Dropout(Layer):
+class Dropout(Module):
     ''' Randomly zeroes some of the elements of the input tensor with probability p. '''
 
     def __init__(self, p: float = 0.5):
         self.p = p
-
-        self.training = True
+        
         self.scale = 1 / (1 - p)
-
-    def named_parameters(self):
-        return []
+        
+        self.training = True
 
     def forward(self, x: Tensor):
         if self.training:
-            mask = mytorch.binomial(1, 1 - self.p, x.shape, mytorch.float32) * self.scale
+            mask = mytorch.binomial(1, 1 - self.p, x.shape, x.dtype, False, x.device) * self.scale
         else:
             mask = 1
 
         return x * mask
+    
+    def eval(self):
+        self.training = False
+        
+    def train(self, mode: bool = True):
+        self.training = mode
 
-class RNN(Layer):
+class RNN(Module):
     ''' Elman RNN '''
 
     def __init__(
@@ -153,6 +120,7 @@ class RNN(Layer):
         bias: bool = True,
         batch_first: bool = False,
         dropout: float = 0.0,
+        device: DeviceLikeType = 'cpu'
     ):
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -160,23 +128,22 @@ class RNN(Layer):
         self.bias = bias
         self.batch_first = batch_first
 
-        self.layers = [RNNCell(input_size, hidden_size, bias, nonlinearity)]
+        self.layers = [RNNCell(input_size, hidden_size, bias, nonlinearity, device)]
         
         for _ in range(num_layers - 1):
-            self.layers.append(RNNCell(hidden_size, hidden_size, bias, nonlinearity))
+            self.layers.append(RNNCell(hidden_size, hidden_size, bias, nonlinearity, device))
 
         self.dropout = Dropout(dropout)
-        
-    def named_parameters(self):
-        parameters: list[tuple[str, Tensor]] = []
 
-        for i, cell in enumerate(self.cells):
-            for name, parameter in cell.named_parameters():
-                parameters.append((f'{name}_{i}', parameter))
-
-        return parameters
+        self.to(device)
 
     def forward(self, x: Tensor, hx: Optional[Tensor] = None) -> Tensor:
+        if self.device != x.device:
+            raise ValueError('Tensors must be on the same device')
+        
+        if hx is not None and self.device != hx.device:
+            raise ValueError('Tensors must be on the same device')
+        
         if self.batch_first:
             x = x.swapaxes(0, 1)
         
@@ -208,8 +175,8 @@ class RNN(Layer):
 
         return output, hn
 
-class LSTMCell(Layer):
-    def __init__(self, input_size: int, hidden_size: int, bias: bool = True):
+class LSTMCell(Module):
+    def __init__(self, input_size: int, hidden_size: int, bias: bool = True, device: DeviceLikeType = 'cpu'):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.bias = bias
@@ -225,16 +192,16 @@ class LSTMCell(Layer):
         else:
             self.bias_ih = None
             self.bias_hh = None
-            
-    def named_parameters(self):
-        return [
-            ('weight_ih', self.weight_ih),
-            ('weight_hh', self.weight_hh),
-            ('bias_ih', self.bias_ih),
-            ('bias_hh', self.bias_hh)
-        ]
+        
+        self.to(device)
         
     def forward(self, x: Tensor, hx: Optional[tuple[Tensor, Tensor]] = None) -> tuple[Tensor, Tensor]:
+        if self.device != x.device:
+            raise ValueError('Tensors must be on the same device')
+        
+        if hx is not None and (self.device != hx[0].device or self.device != hx[1].device):
+            raise ValueError('Tensors must be on the same device')
+        
         if hx is None:
             hx = (
                 mytorch.zeros((x.shape[0], self.hidden_size), mytorch.float32),
@@ -256,7 +223,7 @@ class LSTMCell(Layer):
         
         return h, c
     
-class LSTM(Layer):
+class LSTM(Module):
     def __init__(
         self, 
         input_size: int, 
@@ -265,6 +232,7 @@ class LSTM(Layer):
         bias: bool = True,
         batch_first: bool = False,
         dropout: float = 0.0,
+        device: DeviceLikeType = 'cpu'
     ):
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -272,23 +240,22 @@ class LSTM(Layer):
         self.bias = bias
         self.batch_first = batch_first
 
-        self.layers = [LSTMCell(input_size, hidden_size, bias)]
+        self.layers = [LSTMCell(input_size, hidden_size, bias, device)]
         
         for _ in range(num_layers - 1):
-            self.layers.append(LSTMCell(hidden_size, hidden_size, bias))
+            self.layers.append(LSTMCell(hidden_size, hidden_size, bias, device))
 
         self.dropout = Dropout(dropout)
         
-    def named_parameters(self):
-        parameters: list[tuple[str, Tensor]] = []
-
-        for i, cell in enumerate(self.cells):
-            for name, parameter in cell.named_parameters():
-                parameters.append((f'{name}_{i}', parameter))
-
-        return parameters
-    
+        self.to(device)
+        
     def forward(self, x: Tensor, hx: Optional[tuple[Tensor, Tensor]] = None) -> tuple[Tensor, Tensor]:
+        if self.device != x.device:
+            raise ValueError('Tensors must be on the same device')
+        
+        if hx is not None and (self.device != hx[0].device or self.device != hx[1].device):
+            raise ValueError('Tensors must be on the same device')
+        
         if self.batch_first:
             x = x.swapaxes(0, 1)
         
@@ -323,3 +290,62 @@ class LSTM(Layer):
             output = output.swapaxes(0, 1)
         
         return output, (hn, cn)
+    
+class BatchNorm2d(Module):
+    def __init__(
+        self,
+        num_features: int, 
+        eps: float = 1e-05, 
+        momentum: float = 0.1, 
+        affine: bool = True, 
+        track_running_stats: bool = True, 
+        device: DeviceLikeType = 'cpu'
+    ):
+        self.num_features = num_features
+        self.eps = eps
+        self.momentum = momentum
+        self.affine = affine
+        self.track_running_stats = track_running_stats
+        
+        if affine:
+            self.weight = mytorch.ones((num_features, ), mytorch.float32, True)
+            self.bias = mytorch.zeros((num_features, ), mytorch.float32, True)
+        else:
+            self.weight = None
+            self.bias = None
+        
+        if track_running_stats:
+            self.running_mean = mytorch.zeros((num_features, ), mytorch.float32)
+            self.running_var = mytorch.ones((num_features, ), mytorch.float32)
+        else:
+            self.running_mean = None
+            self.running_var = None
+        
+        self.training = True
+        
+        self.to(device)
+    
+    def forward(self, x: Tensor):
+        if self.device != x.device:
+            raise ValueError('Tensors must be on the same device')
+        
+        if self.training or not self.track_running_stats:
+            mean = x.mean(dim=(0, 2, 3))
+            var = x.var(dim=(0, 2, 3))
+
+        if self.training and self.track_running_stats:
+            self.running_mean = self.momentum * self.running_mean + (1 - self.momentum) * mean
+            self.running_var = self.momentum * self.running_var + (1 - self.momentum) * var
+            
+        if not self.training and self.track_running_stats:
+            mean = self.running_mean
+            var = self.running_var
+            
+        output = (x - mean[None, ..., None, None]) / (var[None, ..., None, None] + self.eps).sqrt()
+        
+        print('OUT SHAPE ->', output.shape)
+        
+        if self.affine:
+            output = output * self.weight[None, ..., None, None] + self.bias[None, ..., None, None]
+            
+        return output

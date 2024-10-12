@@ -1,26 +1,12 @@
-from abc import ABC, abstractmethod
 from typing import Optional, Literal
 
 import mytorch
 
 from mytorch import Tensor
-from mytorch.nn import Softmax
-
-class Loss(ABC):
-    ''' Base class for all loss functions. '''
+from mytorch.nn import Softmax   
+from mytorch.nn.modules import Module
     
-    @abstractmethod
-    def forward(self, p: Tensor, y: Tensor) -> Tensor:
-        ''' Forward pass. '''
-        
-        pass
-    
-    def __call__(self, p: Tensor, y: Tensor) -> Tensor:
-        ''' When the object is called, it calls the forward method. '''
-        
-        return self.forward(p, y)    
-    
-class L1Loss(Loss):
+class L1Loss(Module):
     ''' Mean Absolute Error Loss. '''
     
     def __init__(self, reduction: Literal['mean', 'sum', 'none'] = 'mean'):
@@ -36,7 +22,7 @@ class L1Loss(Loss):
         else:
             return loss
     
-class MSELoss(Loss):
+class MSELoss(Module):
     ''' Mean Squared Error Loss. '''
     
     def __init__(self, reduction: Literal['mean', 'sum', 'none'] = 'mean'):
@@ -52,7 +38,7 @@ class MSELoss(Loss):
         else:
             return loss
                 
-class CrossEntropyLoss(Loss):
+class CrossEntropyLoss(Module):
     ''' Cross Entropy Loss. '''
     
     def __init__(
@@ -71,7 +57,7 @@ class CrossEntropyLoss(Loss):
     def forward(self, p: Tensor, y: Tensor):
         return self.nll_loss(self.softmax(p).log(), y)
 
-class NLLLoss(Loss):
+class NLLLoss(Module):
     ''' Negative Log Likelihood Loss. '''
     
     def __init__(
@@ -108,7 +94,7 @@ class NLLLoss(Loss):
         else:
             return loss
 
-class KLDivLoss(Loss):
+class KLDivLoss(Module):
     ''' Kullback-Leibler Divergence Loss. '''
     
     def __init__(
@@ -134,7 +120,7 @@ class KLDivLoss(Loss):
         else:
             return loss
 
-class BCELoss(Loss):
+class BCELoss(Module):
     ''' Binary Cross Entropy Loss. '''
     
     def __init__(
@@ -158,7 +144,7 @@ class BCELoss(Loss):
         else:
             return loss
 
-class HuberLoss(Loss):
+class HuberLoss(Module):
     ''' Huber Loss. '''
     
     def __init__(
@@ -182,7 +168,7 @@ class HuberLoss(Loss):
         else:
             return loss
 
-class SmoothL1Loss(Loss):
+class SmoothL1Loss(Module):
     ''' Smooth L1 Loss. '''
     
     def __init__(

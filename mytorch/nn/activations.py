@@ -1,22 +1,7 @@
-from abc import ABC, abstractmethod
-
 from mytorch import NDArray, Tensor
+from mytorch.nn.modules import Module
 
-class Activation(ABC):
-    ''' Base class for all loss functions. '''
-
-    @abstractmethod
-    def forward(self, x: Tensor) -> Tensor:
-        ''' Forward pass. '''
-
-        pass
-
-    def __call__(self, x: Tensor) -> Tensor:
-        ''' When the object is called, it calls the forward method. '''
-
-        return self.forward(x)
-
-class ELU(Activation):
+class ELU(Module):
     ''' Exponential Linear Unit activation function. '''
 
     def __init__(self, alpha: float = 1.0):
@@ -32,7 +17,7 @@ class ELU(Activation):
         
         return Tensor(data, x.dtype, x.requires_grad, elu_backward, x.device)
 
-class LeakyReLU(Activation):
+class LeakyReLU(Module):
     ''' Leaky Rectified Linear Unit activation function. '''
 
     def __init__(self, alpha: float = 0.01):
@@ -48,7 +33,7 @@ class LeakyReLU(Activation):
                 
         return Tensor(data, x.dtype, x.requires_grad, leaky_relu_backward, x.device)
 
-class ReLU(Activation):
+class ReLU(Module):
     ''' Rectified Linear Unit activation function. '''
 
     def forward(self, x: Tensor):
@@ -61,7 +46,7 @@ class ReLU(Activation):
         
         return Tensor(data, x.dtype, x.requires_grad, relu_backward, x.device)
 
-class SELU(Activation):
+class SELU(Module):
     ''' Scaled Exponential Linear Unit activation function. '''
 
     def __init__(self):
@@ -78,7 +63,7 @@ class SELU(Activation):
 
         return Tensor(data, x.dtype, x.requires_grad, selu_backward, x.device)
 
-class GELU(Activation):
+class GELU(Module):
     ''' Gaussian Error Linear Unit activation function. '''
 
     def forward(self, x: Tensor):
@@ -99,7 +84,7 @@ class GELU(Activation):
         
         return Tensor(data, x.dtype, x.requires_grad, gelu_backward, x.device)
 
-class Softplus(Activation):
+class Softplus(Module):
     ''' Softplus activation function. '''
 
     def __init__(self, beta: float = 1, threshold: float = 20):
@@ -118,7 +103,7 @@ class Softplus(Activation):
 
         return Tensor(data, x.dtype, x.requires_grad, softplus_backward, x.device)
 
-class Softsign(Activation):
+class Softsign(Module):
     ''' Softsign activation function. '''
 
     def forward(self, x: Tensor):
@@ -131,7 +116,7 @@ class Softsign(Activation):
         
         return Tensor(data, x.dtype, x.requires_grad, softsign_backward, x.device)
 
-class Softmax(Activation):
+class Softmax(Module):
     ''' Softmax activation function. '''
 
     def __init__(self, dim: int = 1):
@@ -142,19 +127,19 @@ class Softmax(Activation):
         return e_x / e_x.sum(dim=self.dim, keepdim=True)
 
 
-class Sigmoid(Activation):
+class Sigmoid(Module):
     ''' Sigmoid activation function. '''
 
     def forward(self, x: Tensor):
         return x.sigmoid()
 
-class Tanh(Activation):
+class Tanh(Module):
     ''' Hyperbolic Tangent activation function. '''
 
     def forward(self, x: Tensor):
         return x.tanh()
 
-class SiLU(Activation):
+class SiLU(Module):
     ''' Sigmoid Linear Unit activation function. '''
     
     def __init__(self):
@@ -163,7 +148,7 @@ class SiLU(Activation):
     def forward(self, x: Tensor):
         return x * self.sigmoid(x)
 
-class LogSigmoid(Activation):
+class LogSigmoid(Module):
     ''' Logarithm of the Sigmoid activation function. '''
 
     def __init__(self):
@@ -172,7 +157,7 @@ class LogSigmoid(Activation):
     def forward(self, x: Tensor):
         return -self.softplus(-x)
 
-class Mish(Activation):
+class Mish(Module):
     ''' Mish activation function. '''
 
     def __init__(self):
