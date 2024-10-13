@@ -1,38 +1,18 @@
-from torch import argmin, tensor, float32, randn
-from torch.nn import BatchNorm2d
-
+import torch
 import mytorch
-from mytorch import nn
 
-layer = BatchNorm2d(2)
+# t = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32, requires_grad=True)
 
-for param in layer._parameters:
-    print(param, '->', layer._parameters[param])
+# y = torch.tile(t, (2, 2))
 
-data = randn(2, 2, 1, 1)
+# print(y)
 
-output = layer(data)
+# y.backward(torch.tensor([[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8], [0.9, 1.0, 1.1, 1.2], [1.3, 1.4, 1.5, 16]]))
 
-print('D', data)
+# print(t.grad)
 
-print('O', output)
+# print(t.repeat(3))
 
+t2 = mytorch.tensor([[1, 2], [3, 4]], dtype=mytorch.float32, requires_grad=True)
 
-print('-' * 50)
-
-layer2 = nn.BatchNorm2d(2)
-layer2.weight.data = layer._parameters['weight'].detach().numpy()
-layer2.bias.data = layer._parameters['bias'].detach().numpy()
-
-# layer2.running_mean.data = layer.running_mean.detach().numpy()
-# layer2.running_var.data = layer.running_var.detach().numpy()
-
-data2 = mytorch.randn(2, 2, 1, 1)
-data2.data = data.detach().numpy()
-
-output2 = layer2(data2)
-
-print('O2', output2)
-
-print('M', layer2.running_mean)
-print('V', layer2.running_var)
+print(t2.repeat(2, axis=1))

@@ -584,6 +584,16 @@ class Tensor:
     
     # Other operations
 
+    def repeat(self, repeats: ShapeLike, axis: SupportsIndex = None):
+        data = self.data.repeat(repeats, axis)
+        repeat_backward = None
+        
+        if self.requires_grad:
+            def repeat_backward(grad: NDArray):
+                self.backward(grad.reshape(self.shape))
+
+        return Tensor(data, self.dtype, self.requires_grad, repeat_backward, self.device)
+
     def stack(self, arrays: Sequence[TensorLikeType], dim: SupportsIndex = 0):
         tensors = [self] + [self.ensure_tensor(item) for item in arrays]
         
@@ -744,7 +754,7 @@ class Tensor:
         return self.data.shape
     
     @property
-    def size(self):
+    def size(self) -> int:
         return self.data.size
     
     @property

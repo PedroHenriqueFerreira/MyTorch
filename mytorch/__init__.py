@@ -124,7 +124,7 @@ def indices(
     else:
         return Tensor(data, dtype=dtype, requires_grad=requires_grad, device=device)
 
-# Non gradient operations
+# Boolean operations (non gradient)
 
 def invert(input: Tensor):
     return input.invert()
@@ -146,6 +146,8 @@ def equal(input: Tensor, other: Tensor):
 
 def not_equal(input: Tensor, other: Tensor):
     return input.not_equal(other)
+
+# Indices operations (non gradient)
 
 def argmin(input: Tensor, dim: Optional[ShapeLike] = None, keepdim: bool = False):
     return input.argmin(dim=dim, keepdim=keepdim)

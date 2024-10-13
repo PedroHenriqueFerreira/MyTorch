@@ -298,14 +298,12 @@ class BatchNorm2d(Module):
         eps: float = 1e-05, 
         momentum: float = 0.1, 
         affine: bool = True, 
-        track_running_stats: bool = True, 
         device: DeviceLikeType = 'cpu'
     ):
         self.num_features = num_features
         self.eps = eps
         self.momentum = momentum
         self.affine = affine
-        self.track_running_stats = track_running_stats
         
         if affine:
             self.weight = mytorch.ones((num_features, ), mytorch.float32, True)
@@ -314,12 +312,8 @@ class BatchNorm2d(Module):
             self.weight = None
             self.bias = None
         
-        if track_running_stats:
-            self.running_mean = mytorch.zeros((num_features, ), mytorch.float32)
-            self.running_var = mytorch.ones((num_features, ), mytorch.float32)
-        else:
-            self.running_mean = None
-            self.running_var = None
+        self.running_mean = mytorch.zeros((num_features, ), mytorch.float32)
+        self.running_var = mytorch.ones((num_features, ), mytorch.float32)
         
         self.training = True
         
@@ -329,23 +323,72 @@ class BatchNorm2d(Module):
         if self.device != x.device:
             raise ValueError('Tensors must be on the same device')
         
-        if self.training or not self.track_running_stats:
-            mean = x.mean(dim=(0, 2, 3))
-            var = x.var(dim=(0, 2, 3))
-
-        if self.training and self.track_running_stats:
-            self.running_mean = self.momentum * self.running_mean + (1 - self.momentum) * mean
-            self.running_var = self.momentum * self.running_var + (1 - self.momentum) * var
+        if self.training:
+            mean = x.mean(dim=(0, 2, 3))     
+            var = x.var(dim=(0, 2, 3), correction=0) 
             
-        if not self.training and self.track_running_stats:
+            var_sample = var * (x.size / (x.size - self.num_features))
+
+            self.running_mean = self.momentum * mean + (1 - self.momentum) * self.running_mean
+            self.running_var = self.momentum * var_sample + (1 - self.momentum) * self.running_var
+        else:
             mean = self.running_mean
             var = self.running_var
             
-        output = (x - mean[None, ..., None, None]) / (var[None, ..., None, None] + self.eps).sqrt()
-        
-        print('OUT SHAPE ->', output.shape)
+        output = (x - mean[None, :, None, None]) / (var[None, :, None, None] + self.eps).sqrt()
         
         if self.affine:
-            output = output * self.weight[None, ..., None, None] + self.bias[None, ..., None, None]
+            output = output * self.weight[None, :, None, None] + self.bias[None, :, None, None]
             
         return output
+    
+class Conv2d(Module):
+    def __init__(
+        self,    
+        in_channels: int, 
+        out_channels: int, 
+        kernel_size: int | tuple[int, int],
+        stride: int | tuple[int, int] = 1, 
+        padding: int | tuple[int, int] = 0, 
+        dilation: int | tuple[int, int] = 1, 
+        bias: bool = True, 
+        device: DeviceLikeType = 'cpu'
+    ):
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+    
+        self.kernel_size = kernel_size if isinstance(kernel_size, tuple) else (kernel_size, kernel_size)
+        self.stride = stride if isinstance(stride, tuple) else (stride, stride)
+        self.padding = padding if isinstance(padding, tuple) else (padding, padding)
+        self.dilation = dilation if isinstance(dilation, tuple) else (dilation, dilation)
+        
+        stdv = 1 / (in_channels * self.kernel_size[0] * self.kernel_size[1]) ** 0.5
+        
+        self.weight = mytorch.uniform(
+            -stdv, 
+            stdv, 
+            (out_channels, in_channels, *self.kernel_size), 
+            mytorch.float32, 
+            True
+        )
+        
+        if bias:
+            self.bias = mytorch.uniform(
+                -stdv, 
+                stdv, 
+                (out_channels, ), 
+                mytorch.float32, 
+                True
+            )
+        
+        
+        self.to(device)
+    
+    def image_to_col(self, x: Tensor) -> Tensor:
+        ...
+    
+    def forward(self, x: Tensor) -> Tensor:
+        if self.device != x.device:
+            raise ValueError('Tensors must be on the same device')
+        
+        
