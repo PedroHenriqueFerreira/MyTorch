@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Union, Literal, Optional
 
 import mytorch
 from mytorch import Tensor, DeviceLikeType
@@ -347,20 +347,20 @@ class Conv2d(Module):
         self,    
         in_channels: int, 
         out_channels: int, 
-        kernel_size: int | tuple[int, int],
-        stride: int | tuple[int, int] = 1, 
-        padding: int | tuple[int, int] = 0, 
-        dilation: int | tuple[int, int] = 1, 
+        kernel_size: Union[int, tuple[int, int]],
+        stride: Union[int, tuple[int, int]] = 1, 
+        padding: Union[int, tuple[int, int], Literal['valid', 'same']] = 0,
+        dilation: Union[int, tuple[int, int]] = 1, 
         bias: bool = True, 
         device: DeviceLikeType = 'cpu'
     ):
         self.in_channels = in_channels
         self.out_channels = out_channels
     
-        self.kernel_size = kernel_size if isinstance(kernel_size, tuple) else (kernel_size, kernel_size)
-        self.stride = stride if isinstance(stride, tuple) else (stride, stride)
-        self.padding = padding if isinstance(padding, tuple) else (padding, padding)
-        self.dilation = dilation if isinstance(dilation, tuple) else (dilation, dilation)
+        self.kernel_size = (kernel_size, kernel_size) if isinstance(kernel_size, int) else kernel_size
+        self.stride = (stride, stride) if isinstance(stride, int) else stride
+        self.dilation = (dilation, dilation) if isinstance(dilation, int) else dilation
+        self.padding = (padding, padding) if isinstance(padding, int) else padding
         
         stdv = 1 / (in_channels * self.kernel_size[0] * self.kernel_size[1]) ** 0.5
         
@@ -380,15 +380,82 @@ class Conv2d(Module):
                 mytorch.float32, 
                 True
             )
-        
+        else:
+            self.bias = None
         
         self.to(device)
-    
-    def image_to_col(self, x: Tensor) -> Tensor:
-        ...
     
     def forward(self, x: Tensor) -> Tensor:
         if self.device != x.device:
             raise ValueError('Tensors must be on the same device')
         
+        batch_size, in_channels, x_h, x_w = x.shape
         
+        k_h, k_w = self.kernel_size
+        s_h, s_w = self.stride
+        d_h, d_w = self.dilation
+        
+        # Calculating dilated kernel size
+        
+        dil_h = d_h * (k_h - 1) + 1
+        dil_w = d_w * (k_w - 1) + 1
+        
+        # Calculating padding size
+        
+        if self.padding == 'valid':
+            pad_h, pad_w = (0, 0), (0, 0)
+        else:
+            if self.padding == 'same':
+                pad_h_sum = d_h * (k_h - 1) - s_h + 1
+                pad_w_sum = d_w * (k_w - 1) - s_w + 1
+                
+                pad_h_0 = pad_h_sum // 2
+                pad_h_1 = pad_h_sum - pad_h_0
+                 
+                pad_w_0 = pad_w_sum // 2
+                pad_w_1 = pad_w_sum - pad_w_0
+            
+                pad_h = abs(pad_h_0), abs(pad_h_1)
+                pad_w = abs(pad_w_0), abs(pad_w_1)
+            
+            else:
+                pad_h = self.padding[0], self.padding[0]
+                pad_w = self.padding[1], self.padding[1]
+            
+        # Calculating output size
+        
+        out_h = (x_h + pad_h[0] + pad_h[1] - d_h * (k_h - 1) - 1) // s_h + 1       
+        out_w = (x_w + pad_w[0] + pad_w[1] - d_w * (k_w - 1) - 1) // s_w + 1
+        
+        out_shape = (batch_size, self.out_channels, out_h, out_w)
+        
+        # Applying padding
+
+        x = x.pad(((0, 0), (0, 0), pad_h, pad_w))
+        
+        # Transforming image to column
+        
+        x_column = mytorch.zeros((batch_size, out_h * out_w, in_channels, k_h, k_w), x.dtype, True, self.device)
+        
+        for i in range(out_h):
+            for j in range(out_w):
+                pos = i * out_w + j
+                
+                i_start, j_start = i * s_h, j * s_w
+                i_end, j_end = i_start + dil_h, j_start + dil_w
+                
+                x_column[:, pos, :, :, :] = x[:, :, i_start : i_end : d_h, j_start : j_end : d_w]
+                
+        x_column = x_column.reshape((batch_size, out_h * out_w, -1))   
+        weight_column = self.weight.reshape((self.out_channels, -1)).T
+        
+        out_column = x_column @ weight_column
+        
+        if self.bias is not None:
+            out_column += self.bias[None, None, :]
+        
+        # Reshaping output
+        
+        out = out_column.transpose((0, 2, 1)).reshape(out_shape)
+        
+        return out

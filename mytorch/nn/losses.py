@@ -75,10 +75,10 @@ class NLLLoss(Module):
             self.weight = mytorch.ones(p.shape[1])
         
         if p.ndim == 2:
-            p = p[..., None]
+            p = p[:, None]
 
         if y.ndim == 1:
-            y = y[..., None]
+            y = y[:, None]
         
         indices = mytorch.indices(y.shape, sparse=True)
         criterion = (indices[0], y, *indices[1:])

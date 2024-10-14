@@ -1,18 +1,9 @@
-import torch
 import mytorch
+from mytorch import nn as nn2
 
-# t = torch.tensor([[1, 2], [3, 4]], dtype=torch.float32, requires_grad=True)
+layer2 = nn2.Conv2d(3, 3, 3, 1, 'valid', 1)
 
-# y = torch.tile(t, (2, 2))
+x2 = mytorch.randn(2, 3, 100, 100, requires_grad=True)
+y2 = layer2(x2)
 
-# print(y)
-
-# y.backward(torch.tensor([[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8], [0.9, 1.0, 1.1, 1.2], [1.3, 1.4, 1.5, 16]]))
-
-# print(t.grad)
-
-# print(t.repeat(3))
-
-t2 = mytorch.tensor([[1, 2], [3, 4]], dtype=mytorch.float32, requires_grad=True)
-
-print(t2.repeat(2, axis=1))
+print(y2)

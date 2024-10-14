@@ -1,5 +1,5 @@
-from typing import Union, Optional, Callable, SupportsIndex, Sequence, Literal
-from numpy._typing import _ShapeLike, ArrayLike, DTypeLike
+from typing import Union, Optional, Callable, SupportsIndex, Sequence, Literal, Any
+from numpy._typing import _ShapeLike, _ArrayLikeInt, ArrayLike, DTypeLike
 
 import numpy as np
 import cupy as cp
@@ -7,6 +7,7 @@ import cupy as cp
 np.seterr(all='ignore')
 
 ShapeLike = _ShapeLike
+ArrayLikeInt = _ArrayLikeInt
 
 NDArray = Union[np.ndarray, cp.ndarray]
 TensorLikeType = Union['Tensor', ArrayLike]
@@ -584,15 +585,38 @@ class Tensor:
     
     # Other operations
 
-    def repeat(self, repeats: ShapeLike, axis: SupportsIndex = None):
-        data = self.data.repeat(repeats, axis)
+    # TODO: Implement multiple repeats and dim parameter
+    def repeat(self, repeat: int):
+        data = self.data.repeat(repeat)
         repeat_backward = None
         
         if self.requires_grad:
             def repeat_backward(grad: NDArray):
-                self.backward(grad.reshape(self.shape))
+                self.backward(grad.reshape((-1, repeat)).sum(axis=1).reshape(self.shape))
 
         return Tensor(data, self.dtype, self.requires_grad, repeat_backward, self.device)
+
+    # TODO: Implement multiple tiles
+    def tile(self, dim: int):
+        data = self.lib.tile(self.data, dim)
+        tile_backward = None
+        
+        if self.requires_grad:
+            def tile_backward(grad: NDArray):
+                self.backward(grad.reshape((dim, -1)).sum(axis=0).reshape(self.shape))
+
+        return Tensor(data, self.dtype, self.requires_grad, tile_backward, self.device)
+
+    # TODO: Implement mode 
+    def pad(self, pad_width: ArrayLikeInt):
+        data = self.lib.pad(self.data, pad_width)
+        pad_backward = None
+        
+        if self.requires_grad:
+            def pad_backward(grad: NDArray):
+                self.backward(grad[tuple([slice(left, -right if right != 0 else None) for left, right in pad_width])])
+                
+        return Tensor(data, self.dtype, self.requires_grad, pad_backward, self.device)
 
     def stack(self, arrays: Sequence[TensorLikeType], dim: SupportsIndex = 0):
         tensors = [self] + [self.ensure_tensor(item) for item in arrays]
@@ -655,17 +679,32 @@ class Tensor:
 
     def getitem(self, key):
         data = self.data[key]
-        requires_grad = self.requires_grad
-        select_backward = None
+        getitem_backward = None
         
-        if requires_grad:
-            def select_backward(grad: NDArray):
+        if self.requires_grad:
+            def getitem_backward(grad: NDArray):
                 grad_ = self.lib.zeros(self.shape)
                 grad_[key] = grad.data
                 
                 self.backward(grad_)
 
-        return Tensor(data, self.dtype, requires_grad, select_backward, self.device) 
+        return Tensor(data, self.dtype, self.requires_grad, getitem_backward, self.device) 
+
+    def setitem(self, key, value: TensorLikeType):
+        if not hasattr(self, 'setitem_tensors'):
+            self.setitem_tensors: list[tuple[Any, Tensor]] = []
+        
+        value_t = self.ensure_tensor(value)
+        self.setitem_tensors.append((key, value_t))
+        
+        self.data[key] = value_t.data
+        
+        if self.requires_grad:
+            def setitem_backward(grad: NDArray):
+                for key, value_t in self.setitem_tensors:
+                    value_t.backward(grad[key])
+        
+            self.grad_fn = setitem_backward
 
     def iter(self):
         return iter(self.getitem(i) for i in range(self.shape[0]))
@@ -741,6 +780,9 @@ class Tensor:
     def __getitem__(self, key):
         return self.getitem(key)
         
+    def __setitem__(self, key, value: TensorLikeType):
+        self.setitem(key, value)
+        
     def __iter__(self):
         return self.iter()
 
@@ -769,8 +811,7 @@ class Tensor:
     def T(self):
         return self.transpose()
     
-    # Backward
-
+    # Backward method
     def backward(self, grad: Optional[NDArray] = None):
         ''' Backpropagates the gradient through the computation graph '''
         
@@ -782,7 +823,7 @@ class Tensor:
             grad = self.lib.ones(self.shape, dtype=self.dtype)
         else:
             grad = self.lib.array(grad, dtype=self.dtype)
-        
+                
         # Sum gradient to match data shape
         if self.shape != grad.shape:
             keepdims = self.ndim == grad.ndim
