@@ -219,6 +219,9 @@ def maximum(input: Tensor, other: Tensor):
 def minimum(input: Tensor, other: Tensor):
     return input.minimum(other)
 
+def embedding(input: Tensor, other: Tensor):
+    return input.embedding(other)
+
 # Batch operations
 
 def sum(input: Tensor, dim: Optional[ShapeLike] = None, keepdim: bool = False):

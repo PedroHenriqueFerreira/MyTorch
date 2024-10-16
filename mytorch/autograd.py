@@ -429,6 +429,24 @@ class Tensor:
 
         return Tensor(data, self.dtype, requires_grad, minimum_backward, self.device)
 
+    def embedding(self, other: TensorLikeType):
+        other_t = self.ensure_tensor(other)
+        
+        data = self.data[other_t.data]
+        embedding_backward = None
+        
+        if self.requires_grad:
+            def embedding_backward(grad: NDArray):
+                grad_ = self.lib.zeros(self.shape)
+                grad_[other_t.data] = grad.data
+                
+                for i, count in enumerate(self.lib.bincount(other_t.data.reshape(-1))):
+                    grad_[i] *= count
+                
+                self.backward(grad_)
+                
+        return Tensor(data, self.dtype, self.requires_grad, embedding_backward, self.device)
+
     # Batch operations
 
     def sum(self, dim: Optional[ShapeLike] = None, keepdim: bool = False):
@@ -680,7 +698,7 @@ class Tensor:
     def getitem(self, key):
         data = self.data[key]
         getitem_backward = None
-        
+
         if self.requires_grad:
             def getitem_backward(grad: NDArray):
                 grad_ = self.lib.zeros(self.shape)
