@@ -608,8 +608,8 @@ class Tensor:
         return Tensor(data, self.dtype, self.requires_grad, tile_backward, self.device)
 
     # TODO: Implement mode 
-    def pad(self, pad_width: ArrayLikeInt):
-        data = self.lib.pad(self.data, pad_width)
+    def pad(self, pad_width: ArrayLikeInt, constant_values: float = 0.0):
+        data = self.lib.pad(self.data, pad_width, constant_values=constant_values)
         pad_backward = None
         
         if self.requires_grad:

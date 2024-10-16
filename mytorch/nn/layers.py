@@ -429,6 +429,8 @@ class Conv2d(Module):
         
         out_shape = (batch_size, self.out_channels, out_h, out_w)
         
+        ############################################
+        
         # Applying padding
 
         x = x.pad(((0, 0), (0, 0), pad_h, pad_w))
@@ -444,17 +446,24 @@ class Conv2d(Module):
                 i_start, j_start = i * s_h, j * s_w
                 i_end, j_end = i_start + di_h, j_start + di_w
                 
-                x_col[:, pos, :, :, :] = x[:, :, i_start : i_end : d_h, j_start : j_end : d_w]
+                h_slice, w_slice = slice(i_start, i_end, d_h), slice(j_start, j_end, d_w)
+                
+                x_col[:, pos, :, :, :] = x[:, :, h_slice, w_slice]
                 
         x_col = x_col.reshape((batch_size, out_h * out_w, -1))   
+        
+        # Transforming kernel to column
+        
         weight_col = self.weight.reshape((self.out_channels, -1)).T
+        
+        # Calculating output column
         
         out_col = x_col @ weight_col
         
         if self.bias is not None:
             out_col += self.bias[None, None, :]
         
-        # Reshaping output
+        # Output column to image
         
         out = out_col.transpose((0, 2, 1)).reshape(out_shape)
         
@@ -511,7 +520,7 @@ class ConvTranspose2d(Module):
         
         batch_size, in_channels, x_h, x_w = x.shape
         
-        opad_h, opad_w = self.output_padding
+        out_pad_h, out_pad_w = self.output_padding
         
         k_h, k_w = self.kernel_size
         s_h, s_w = self.stride
@@ -524,37 +533,130 @@ class ConvTranspose2d(Module):
         
         # Calculating padding size
         
-        pad_h = self.padding[0], self.padding[0]
-        pad_w = self.padding[1], self.padding[1]
+        pad_h, pad_w = self.padding
 
-        out_h = (x_h - 1) * s_h - (pad_h[0] + pad_h[1]) + di_h + opad_h
-        out_w = (x_w - 1) * s_w - (pad_w[0] + pad_w[1]) + di_w + opad_w
+        # Calculating output size
+
+        out_h = (x_h - 1) * s_h + di_h + out_pad_h
+        out_w = (x_w - 1) * s_w + di_w + out_pad_w
         
         out_shape = (batch_size, self.out_channels, out_h, out_w)
         
-        x = x.pad(((0, 0), (0, 0), pad_h, pad_w))
+        # Transforming image to column
         
         x_col = x.reshape((batch_size, in_channels, -1)).transpose((0, 2, 1))
+        
+        # Transforming kernel to column
+        
         weight_col = self.weight.reshape((in_channels, -1)).T
         
-        print('XX', x_col.shape)
-        print('WW', weight_col.T.shape)
+        # Calculating output column
         
         out_col = x_col @ weight_col.T
-
-        print('A', out_col.shape)
         
-        out_col = out_col.reshape((out_col.shape[0], out_col.shape[1], self.out_channels, k_h, k_w))
+        out_col = out_col.reshape((batch_size, x_h * x_w, self.out_channels, k_h, k_w))
+        
+        # Calculating output
         
         out = mytorch.zeros(out_shape, x.dtype, True, self.device)
         
-        for pos in range(out_h * out_w):
-            i = pos // out_h
-            j = pos % out_h
+        for i in range(x_h):
+            for j in range(x_w):
+                pos = i * x_w + j
+
+                i_start, j_start = i * s_h, j * s_w
+                i_end, j_end = i_start + di_h, j_start + di_w
+                
+                h_slice, w_slice = slice(i_start, i_end, d_h), slice(j_start, j_end, d_w)
+                
+                fragment = out[:, :, h_slice, w_slice].detach()
+                
+                out[:, :, h_slice, w_slice] = fragment + out_col[:, pos, :, :, :]
             
-            i_start, j_start = i * s_h, j * s_w
-            i_end, j_end = i_start + di_h, j_start + di_w
-            
-            out[:, :, i_start : i_end : d_h, j_start : j_end : d_w] += out_col[:, pos, :, :, :]
-            
+        out += self.bias[None, :, None, None]
+        
+        # Removing padding
+        
+        out = out[:, :, pad_h : out_h - pad_h, pad_w : out_w - pad_w]
+        
         return out
+    
+class MaxPool2d(Module):
+    def __init__(
+        self,
+        kernel_size: Union[int, tuple[int, int]],
+        stride: Union[int, tuple[int, int]] = 1,
+        padding: Union[int, tuple[int, int]] = 0,
+        dilation: Union[int, tuple[int, int]] = 1, 
+        device: DeviceLikeType = 'cpu'
+    ):
+        self.kernel_size = (kernel_size, kernel_size) if isinstance(kernel_size, int) else kernel_size
+        self.stride = (stride, stride) if isinstance(stride, int) else stride
+        self.padding = (padding, padding) if isinstance(padding, int) else padding
+        self.dilation = (dilation, dilation) if isinstance(dilation, int) else dilation
+        
+        self.to(device)
+        
+    def forward(self, x: Tensor) -> Tensor:
+        k_h, k_w = self.kernel_size
+        s_h, s_w = self.stride
+        p_h, p_w = self.padding
+        d_h, d_w = self.dilation
+        
+        batch_size, in_channels, x_h, x_w = x.shape
+        
+        # Calculating dilated kernel size
+        
+        di_h = d_h * (k_h - 1) + 1
+        di_w = d_w * (k_w - 1) + 1
+        
+        # Calculating output size
+        
+        out_h = (x_h + 2 * p_h - di_h) // s_h + 1
+        out_w = (x_w + 2 * p_w - di_w) // s_w + 1
+        
+        # Applying padding
+        
+        x = x.pad(((0, 0), (0, 0), (p_h, p_h), (p_w, p_w)), float('-inf'))
+        
+        # Image to column
+        
+        x_col = mytorch.zeros((batch_size, out_h * out_w, in_channels, k_h, k_w), x.dtype, True, x.device)
+        
+        for i in range(out_h):
+            for j in range(out_w):
+                pos = i * out_w + j
+                
+                i_start, j_start = i * s_h, j * s_w
+                i_end, j_end = i_start + di_h, j_start + di_w
+                
+                h_slice, w_slice = slice(i_start, i_end, d_h), slice(j_start, j_end, d_w)
+
+                x_col[:, pos, :, :, :] = x[:, :, h_slice, w_slice]
+                
+        x_col = x_col.reshape((batch_size, out_h * out_w, -1))
+        
+        # Calculating output
+        
+        out_col = x_col.reshape((batch_size, out_h * out_w, in_channels, -1))
+    
+        out_col = out_col.max(dim=3).transpose((0, 2, 1))
+        
+        out = out_col.reshape((batch_size, in_channels, out_h, out_w))
+        
+        return out
+    
+class Flatten(Module):
+    def __init__(self, start_dim: int = 1, end_dim: int = -1):
+        self.start_dim = start_dim
+        self.end_dim = end_dim
+    
+    def forward(self, x: Tensor) -> Tensor:
+        start = self.start_dim if self.start_dim >= 0 else x.ndim + self.start_dim
+        end = self.end_dim if self.end_dim >= 0 else x.ndim + self.end_dim
+        
+        product = x.lib.prod(x.shape[start : end + 1])
+        
+        out_shape = x.shape[:start] + (product, ) + x.shape[end + 1:]
+        
+        return x.reshape(out_shape)
