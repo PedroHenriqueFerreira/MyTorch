@@ -86,6 +86,9 @@ class Tensor:
     def cuda(self):
         return self.to('cuda')
     
+    def item(self):
+        return self.data.item()
+    
     # Boolean operations (non gradient)
 
     def invert(self):
@@ -438,7 +441,7 @@ class Tensor:
         if self.requires_grad:
             def embedding_backward(grad: NDArray):
                 grad_ = self.lib.zeros(self.shape)
-                grad_[other_t.data] = grad.data
+                grad_[other_t.data] = grad
                 
                 for i, count in enumerate(self.lib.bincount(other_t.data.reshape(-1))):
                     grad_[i] *= count
@@ -702,7 +705,8 @@ class Tensor:
         if self.requires_grad:
             def getitem_backward(grad: NDArray):
                 grad_ = self.lib.zeros(self.shape)
-                grad_[key] = grad.data
+                
+                grad_[key] = grad
                 
                 self.backward(grad_)
 
@@ -720,7 +724,8 @@ class Tensor:
         if self.requires_grad:
             def setitem_backward(grad: NDArray):
                 for key, value_t in self.setitem_tensors:
-                    value_t.backward(grad[key])
+                    if value_t.requires_grad:
+                        value_t.backward(grad[key])
         
             self.grad_fn = setitem_backward
 
@@ -805,7 +810,7 @@ class Tensor:
         return self.iter()
 
     def __array__(self):
-        return self.data
+        return self.data if self.device == 'cpu' else self.data.get()
 
     # Properties
 
@@ -853,7 +858,7 @@ class Tensor:
 
             grad_shape = self.lib.array(grad.shape)
 
-            dim = tuple(self.lib.where(self_shape != grad_shape)[0])
+            dim = tuple([value.item() for value in self.lib.where(self_shape != grad_shape)[0]])
 
             grad = grad.sum(axis=dim, keepdims=keepdims).reshape(self.shape)
 

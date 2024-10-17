@@ -72,7 +72,7 @@ class RNNCell(Module):
             raise ValueError('Tensors must be on the same device')
         
         if hx is None:
-            hx = mytorch.zeros((x.shape[0], self.hidden_size), mytorch.float32)
+            hx = mytorch.zeros((x.shape[0], self.hidden_size), mytorch.float32, False, self.device)
         
         y = x @ self.weight_ih.T + hx @ self.weight_hh.T
 
@@ -150,7 +150,7 @@ class RNN(Module):
         sequence_size, batch_size = x.shape[:2]
 
         if hx is None:
-            hx = mytorch.zeros((self.num_layers, batch_size, self.hidden_size), mytorch.float32)
+            hx = mytorch.zeros((self.num_layers, batch_size, self.hidden_size), mytorch.float32, False, self.device)
 
         hidden = [hx[i] for i in range(self.num_layers)]
 
@@ -204,8 +204,8 @@ class LSTMCell(Module):
         
         if hx is None:
             hx = (
-                mytorch.zeros((x.shape[0], self.hidden_size), mytorch.float32),
-                mytorch.zeros((x.shape[0], self.hidden_size), mytorch.float32)
+                mytorch.zeros((x.shape[0], self.hidden_size), mytorch.float32, False, self.device),
+                mytorch.zeros((x.shape[0], self.hidden_size), mytorch.float32, False, self.device)
             )
         
         y = x @ self.weight_ih.T + hx[0] @ self.weight_hh.T
@@ -263,8 +263,8 @@ class LSTM(Module):
         
         if hx is None:
             hx = (
-                mytorch.zeros((self.num_layers, batch_size, self.hidden_size), mytorch.float32),
-                mytorch.zeros((self.num_layers, batch_size, self.hidden_size), mytorch.float32)
+                mytorch.zeros((self.num_layers, batch_size, self.hidden_size), mytorch.float32, False, self.device),
+                mytorch.zeros((self.num_layers, batch_size, self.hidden_size), mytorch.float32, False, self.device)
             )
             
         hidden = [(hx[0][i], hx[1][i]) for i in range(self.num_layers)]
@@ -319,7 +319,7 @@ class GRUCell(Module):
             raise ValueError('Tensors must be on the same device')
         
         if hx is None:
-            hx = mytorch.zeros((x.shape[0], self.hidden_size), mytorch.float32)
+            hx = mytorch.zeros((x.shape[0], self.hidden_size), mytorch.float32, False, self.device)
             
         yi, yh = x @ self.weight_ih.T, hx @ self.weight_hh.T
         
@@ -380,7 +380,7 @@ class GRU(Module):
         sequence_size, batch_size = x.shape[:2]
 
         if hx is None:
-            hx = mytorch.zeros((self.num_layers, batch_size, self.hidden_size), mytorch.float32)
+            hx = mytorch.zeros((self.num_layers, batch_size, self.hidden_size), mytorch.float32, False, self.device)
 
         hidden = [hx[i] for i in range(self.num_layers)]
 

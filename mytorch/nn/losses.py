@@ -133,7 +133,7 @@ class BCELoss(Module):
     
     def forward(self, p: Tensor, y: Tensor):
         if self.weight is None:
-            self.weight = mytorch.ones(1)
+            self.weight = mytorch.ones(1, dtype=p.dtype, device=p.device)
         
         loss = -self.weight * (y * p.log(True) + (1 - y) * (1 - p).log(True)) * (p != y)
         
